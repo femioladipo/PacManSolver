@@ -69,7 +69,8 @@ class Grid:
 
     def __deepcopy__(self, memo):
         grid = Grid(fn=self.__fn, height=self.__height, width=self.__width)
-        grid._Grid__grid = [[copy(item) for item in lst]for lst in self.__grid]
+        grid._Grid__grid = [[copy(item) for item in lst]
+                            for lst in self.__grid]
         return grid
 
     def update(self, state):
@@ -173,44 +174,40 @@ class MDPAgent(Agent):
         """
         north = sum([
             0.8 * self.__grid[x][y + 1].utility if self.__grid[x][y +
-                                                                  1].utility != '*' else self.__grid[x][y].utility,
+                                                                  1].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
+                                                             1][y].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x-1][y].utility if self.__grid[x -
-                                                             1][y].utility != '*' else self.__grid[x][y].utility
+                                                             1][y].type != States.WALL else self.__grid[x][y].utility
         ])
 
         east = sum([
             0.8 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
+                                                             1][y].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x][y+1].utility if self.__grid[x][y +
-                                                                1].utility != '*' else self.__grid[x][y].utility,
+                                                                1].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x][y-1].utility if self.__grid[x][y -
-                                                                1].utility != '*' else self.__grid[x][y].utility
+                                                                1].type != States.WALL else self.__grid[x][y].utility
         ])
 
         south = sum([
             0.8 * self.__grid[x][y - 1].utility if self.__grid[x][y -
-                                                                  1].utility != '*' else self.__grid[x][y].utility,
+                                                                  1].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
+                                                             1][y].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x-1][y].utility if self.__grid[x -
-                                                             1][y].utility != '*' else self.__grid[x][y].utility
+                                                             1][y].type != States.WALL else self.__grid[x][y].utility
         ])
 
         west = sum([
             0.8 * self.__grid[x - 1][y].utility if self.__grid[x -
-                                                               1][y].utility != '*' else self.__grid[x][y].utility,
+                                                               1][y].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x][y+1].utility if self.__grid[x][y +
-                                                                1].utility != '*' else self.__grid[x][y].utility,
+                                                                1].type != States.WALL else self.__grid[x][y].utility,
             0.1 * self.__grid[x][y-1].utility if self.__grid[x][y -
-                                                                1].utility != '*' else self.__grid[x][y].utility
+                                                                1].type != States.WALL else self.__grid[x][y].utility
         ])
-        # print self.__grid[x+1][y].utility
-        # print self.__grid[x-1][y].utility
-        # print self.__grid[x][y+1].utility
-        # print self.__grid[x][y-1].utility
-        # print '---------------------------'
+
         return max(north, east, south, west)
 
     def final(self, state):
