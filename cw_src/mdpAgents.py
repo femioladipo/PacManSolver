@@ -1,5 +1,5 @@
 from copy import deepcopy, copy
-
+from collections import defaultdict
 
 from pacman import Directions
 from game import Agent
@@ -23,10 +23,10 @@ class Point:
     reward = {
         States.PACMAN: -0.04,
         States.SPACE: -0.04,
-        States.WALL: '*',
+        States.WALL: 0,
         States.CAPSULE: 2,
         States.FOOD: 1,
-        States.GHOST: -1,
+        States.GHOST: -2,
         States.GHOST_NEIGHBOUR: -1
     }
 
@@ -50,7 +50,6 @@ class Point:
 
 class Grid:
     def __init__(self, fn, height, width):
-        # self.isPristine = True
         self.__fn = fn
         self.__height = height
         self.__width = width
@@ -91,7 +90,7 @@ class Grid:
 
         for (x, y), timer in api.ghostStatesWithTimes(state):
             x, y = int(x), int(y)
-            if timer < 2:
+            if timer > 2:
                 self.__grid[x][y].type = States.GHOST
                 if self.__grid[x][y+1].type != States.WALL:
                     self.__grid[x][y+1].type = States.GHOST_NEIGHBOUR
@@ -109,13 +108,20 @@ class Grid:
 class MDPAgent(Agent):
     threshold = 0.001
     gamma = 0.9
+    probabilities = [0.8, 0.1, 0.1]
+    directions = {
+        Directions.NORTH: [(0, 1), (1, 0), (-1, 0)],
+        Directions.EAST: [(1, 0), (0, -1), (0, 1)],
+        Directions.SOUTH: [(0, -1), (-1, 0), (1, 0)],
+        Directions.WEST: [(-1, 0), (0, 1), (0, -1)]
+    }
 
     def __init__(self):
-        """
+        '''
         Initialize rewards, gamma and iterating threshold for the game
-        """
-        print "Starting up MDPAgent!"
-        name = "Pacman"
+        '''
+        print 'Starting up MDPAgent!'
+        name = 'Pacman'
 
     def registerInitialState(self, state):
         height = max([h for w, h in api.corners(state)]) + 1
@@ -123,9 +129,9 @@ class MDPAgent(Agent):
         self.__grid = Grid(fn=Point, height=height, width=width)
 
     def getAction(self, state):
-        """
+        '''
         Return the moving direction of pacman
-        """
+        '''
         self.__grid.update(state)
 
         self.__value_iteration()
@@ -144,9 +150,9 @@ class MDPAgent(Agent):
         return api.makeMove(move, api.legalActions(state))
 
     def __value_iteration(self):
-        """
+        '''
         value iteration for MDP
-        """
+        '''
         while True:
             changes = False
             grid_copy = deepcopy(self.__grid)
@@ -168,51 +174,23 @@ class MDPAgent(Agent):
                 break
 
     def __calculate_MEU(self, x, y):
-        """
+        '''
         Calculate maximum expected utility for given state(x, y)
-        """
-        north = sum([
-            0.8 * self.__grid[x][y + 1].utility if self.__grid[x][y +
-                                                                  1].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x-1][y].utility if self.__grid[x -
-                                                             1][y].utility != '*' else self.__grid[x][y].utility
-        ])
+        '''
+        EU_values = defaultdict(int)
+        position = self.__grid[x][y]
+        for direction, coords in MDPAgent.directions.items():
+            for i, (dx, dy) in enumerate(coords):
+                new_position = self.__grid[x+dx][y+dy]
+                if new_position.type != States.WALL:
+                    EU_values[direction] += MDPAgent.probabilities[i] * \
+                        new_position.utility
+                else:
+                    EU_values[direction] += MDPAgent.probabilities[i] * \
+                        position.utility
 
-        east = sum([
-            0.8 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x][y+1].utility if self.__grid[x][y +
-                                                                1].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x][y-1].utility if self.__grid[x][y -
-                                                                1].utility != '*' else self.__grid[x][y].utility
-        ])
-
-        south = sum([
-            0.8 * self.__grid[x][y - 1].utility if self.__grid[x][y -
-                                                                  1].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x+1][y].utility if self.__grid[x +
-                                                             1][y].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x-1][y].utility if self.__grid[x -
-                                                             1][y].utility != '*' else self.__grid[x][y].utility
-        ])
-
-        west = sum([
-            0.8 * self.__grid[x - 1][y].utility if self.__grid[x -
-                                                               1][y].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x][y+1].utility if self.__grid[x][y +
-                                                                1].utility != '*' else self.__grid[x][y].utility,
-            0.1 * self.__grid[x][y-1].utility if self.__grid[x][y -
-                                                                1].utility != '*' else self.__grid[x][y].utility
-        ])
-        # print self.__grid[x+1][y].utility
-        # print self.__grid[x-1][y].utility
-        # print self.__grid[x][y+1].utility
-        # print self.__grid[x][y-1].utility
-        # print '---------------------------'
-        return max(north, east, south, west)
+        return max(*EU_values.values())
 
     def final(self, state):
-        print "Let's try again!"
+        print 'Let\'s try again!'
         self.registerInitialState(state)
