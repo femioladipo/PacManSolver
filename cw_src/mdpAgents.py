@@ -10,6 +10,9 @@ import util
 
 
 class States:
+    '''
+    Enum of possible board point states.
+    '''
     PACMAN = 'PACMAN'
     SPACE = 'SPACE'
     WALL = 'WALL'
@@ -20,6 +23,9 @@ class States:
 
 
 class Point:
+    '''
+    A single point on the board, 
+    '''
     reward = {
         States.PACMAN: -0.04,
         States.SPACE: -0.04,
@@ -54,7 +60,7 @@ class Grid:
         self.__height = height
         self.__width = width
         self.__grid = [
-            [fn() for _ in xrange(self.__width)] for _ in xrange(self.__height)
+            [fn() for _ in xrange(self.__height)] for _ in xrange(self.__width)
         ]
 
     def __getitem__(self, key):
@@ -68,12 +74,14 @@ class Grid:
 
     def __deepcopy__(self, memo):
         grid = Grid(fn=self.__fn, height=self.__height, width=self.__width)
-        grid._Grid__grid = [[copy(item) for item in lst]for lst in self.__grid]
+        grid._Grid__grid = [
+            [copy(point) for point in row] for row in self.__grid
+        ]
         return grid
 
     def update(self, state):
         self.__grid = [
-            [self.__fn() for _ in xrange(self.__height)] for _ in xrange(self.__width)
+            [self.__fn() for point in row] for row in self.__grid
         ]
 
         x, y = api.whereAmI(state)
@@ -90,7 +98,7 @@ class Grid:
 
         for (x, y), timer in api.ghostStatesWithTimes(state):
             x, y = int(x), int(y)
-            if timer > 2:
+            if timer < 2:
                 self.__grid[x][y].type = States.GHOST
                 if self.__grid[x][y+1].type != States.WALL:
                     self.__grid[x][y+1].type = States.GHOST_NEIGHBOUR
@@ -106,6 +114,9 @@ class Grid:
 
 
 class MDPAgent(Agent):
+    '''
+    MDP
+    '''
     threshold = 0.001
     gamma = 0.9
     probabilities = [0.8, 0.1, 0.1]
@@ -115,13 +126,6 @@ class MDPAgent(Agent):
         Directions.SOUTH: [(0, -1), (-1, 0), (1, 0)],
         Directions.WEST: [(-1, 0), (0, 1), (0, -1)]
     }
-
-    def __init__(self):
-        '''
-        Initialize rewards, gamma and iterating threshold for the game
-        '''
-        print 'Starting up MDPAgent!'
-        name = 'Pacman'
 
     def registerInitialState(self, state):
         height = max([h for w, h in api.corners(state)]) + 1
@@ -135,19 +139,19 @@ class MDPAgent(Agent):
         self.__grid.update(state)
 
         self.__value_iteration()
-        # print self.__grid
+
         x, y = api.whereAmI(state)
 
-        moves = {
-            Directions.NORTH: self.__grid[x][y+1].utility,
-            Directions.EAST: self.__grid[x+1][y].utility,
-            Directions.SOUTH: self.__grid[x][y-1].utility,
-            Directions.WEST: self.__grid[x-1][y].utility
-        }
+        legal = api.legalActions(state)
 
-        move, _ = sorted(moves.items(), key=lambda kv: kv[1], reverse=True)[0]
-        # print move
-        return api.makeMove(move, api.legalActions(state))
+        moves = [
+            (direction, self.__grid[x+dx][y+dy].utility)
+            for direction, [(dx, dy), _, _] in MDPAgent.directions.items() if direction in legal
+        ]
+
+        move = max(moves, key=lambda kv: kv[1])[0]
+
+        return api.makeMove(move, legal)
 
     def __value_iteration(self):
         '''
@@ -175,10 +179,11 @@ class MDPAgent(Agent):
 
     def __calculate_MEU(self, x, y):
         '''
-        Calculate maximum expected utility for given state(x, y)
+        Calculate maximum expected utility at ...
         '''
         EU_values = defaultdict(int)
         position = self.__grid[x][y]
+
         for direction, coords in MDPAgent.directions.items():
             for i, (dx, dy) in enumerate(coords):
                 new_position = self.__grid[x+dx][y+dy]
