@@ -18,7 +18,6 @@ class States:
     WALL = 'WALL'
     CAPSULE = 'CAPSULE'
     FOOD = 'FOOD'
-    GHOST = 'GHOST'
     GHOST_NEIGHBOUR = 'GHOST_NEIGHBOUR'
     GHOST_EDIBLE = 'GHOST_EDIBLE'
     GHOST_HOSTILE = 'GHOST_HOSTILE'
@@ -57,7 +56,7 @@ class Point:
     def __getattr__(self, key):
         if key == 'reward':
             return Point.REWARDS[self.type]
-    
+
     def __copy__(self):
         return Point(utility=self.utility, type=self.type)
 
@@ -94,7 +93,7 @@ class Grid:
         self.__grid = [
             [fn() for _ in xrange(self.__HEIGHT)] for _ in xrange(self.__WIDTH)
         ]
-    
+
     def __getitem__(self, key):
         return self.__grid[key]
 
@@ -168,6 +167,7 @@ class Grid:
             else:
                 self.__grid[x][y].type = States.GHOST_EDIBLE
 
+
 class MDPAgent(Agent):
     '''
     The MDPAgent the calculates the new utility values, using value interation
@@ -175,12 +175,12 @@ class MDPAgent(Agent):
     resulting utility values.
     '''
 
-    threshold = 0.00001
+    threshold = 0.001
     gamma = 0.9
     DIRECTIONS = {
         Directions.NORTH: (0, 1),
         Directions.EAST: (1, 0),
-        Directions.SOUTH: (0,-1),
+        Directions.SOUTH: (0, -1),
         Directions.WEST: (-1, 0)
     }
     NON_DETERMINISTIC_DIRECTIONS = {
@@ -197,8 +197,8 @@ class MDPAgent(Agent):
         Args:
             state: Current game state.
         '''
-        height = max([h for w, h in api.corners(state)]) + 1
-        width = max([w for w, h in api.corners(state)]) + 1
+        height = max([h for _, h in api.corners(state)]) + 1
+        width = max([w for w, _ in api.corners(state)]) + 1
         self.__grid = Grid(fn=Point, height=height, width=width)
         # MDPAgent.gamma = 0.7 if (11, 20) == (height, width) else 0.9
 
@@ -208,11 +208,14 @@ class MDPAgent(Agent):
 
         Args:
             state: Current game state.
+
+        Returns:
+            A direction representing where pacman should move next.
         '''
         self.__grid.update(state)
 
         self.__value_iteration()
-        
+
         x, y = api.whereAmI(state)
 
         legal = api.legalActions(state)
@@ -240,7 +243,7 @@ class MDPAgent(Agent):
                     if (self.__grid[x][y].type != States.WALL):
                         utility = self.__grid[x][y].reward + \
                             MDPAgent.gamma * self.__calculate_MEU(x, y)
-            
+
                         grid_copy[x][y].utility = utility
 
                         if abs(self.__grid[x][y].utility - grid_copy[x][y].utility) > MDPAgent.threshold:
@@ -253,15 +256,18 @@ class MDPAgent(Agent):
 
     def __calculate_MEU(self, x, y):
         '''
-        Calcualtes the maximum expected utility at (x, y).
+        Calculates and returns the maximum expected utility at (x, y).
 
         Args:
             x (int): The x-coordinate.
             y (int): The y-coordinate.
+
+        Returns:
+            Floating point number representing maximum expected utility.
         '''
         EU_values = defaultdict(int)
         position = self.__grid[x][y]
-        
+
         for main_direction, displacement in MDPAgent.DIRECTIONS.items():
             main_direction_prob = [(displacement, api.directionProb)]
             non_deterministic_directions_prob = [
@@ -269,7 +275,8 @@ class MDPAgent(Agent):
             ]
             for (dx, dy), prob in main_direction_prob + non_deterministic_directions_prob:
                 new_position = self.__grid[x+dx][y+dy]
-                EU_values[main_direction] += prob * (new_position.utility if new_position.type != States.WALL else position.utility)
+                EU_values[main_direction] += prob * (
+                    new_position.utility if new_position.type != States.WALL else position.utility)
 
         return max(*EU_values.values())
 
