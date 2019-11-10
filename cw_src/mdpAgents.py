@@ -29,7 +29,7 @@ class Point:
 
     Attributes:
         type (States): Current type, discribing the state of the point.
-        reward (float): Current reward value of this point depedant on current type.
+        reward (float): Current reward value of this point dependent on current type.
         utility (float): Current utility value of this point.
     '''
 
@@ -171,12 +171,12 @@ class Grid:
 class MDPAgent(Agent):
     '''
     The MDPAgent the calculates the new utility values, using value interation
-    on every game step. In addition, pick the best next move depedant on the
+    on every game step. In addition, pick the best next move dependent on the
     resulting utility values.
     '''
 
-    threshold = 0.001
-    gamma = 0.9
+    THRESHOLD = 0.001
+    GAMMA = 0.9
     DIRECTIONS = {
         Directions.NORTH: (0, 1),
         Directions.EAST: (1, 0),
@@ -192,7 +192,7 @@ class MDPAgent(Agent):
 
     def registerInitialState(self, state):
         '''
-        Instatiates initial grid based on game state.
+        Instantiates initial grid based on game state.
 
         Args:
             state: Current game state.
@@ -204,7 +204,7 @@ class MDPAgent(Agent):
 
     def getAction(self, state):
         '''
-        Picks the best next move depedant on state.
+        Picks the best next move dependent on state.
 
         Args:
             state: Current game state.
@@ -231,7 +231,7 @@ class MDPAgent(Agent):
 
     def __value_iteration(self):
         '''
-        Calculates a sets new utlity values for every point on the grid, repeating
+        Calculates a sets new utility values for every point on the grid, repeating
         until new utility values converge within MDPAgent.Threshold.
         '''
         while True:
@@ -242,11 +242,11 @@ class MDPAgent(Agent):
                 for y in xrange(self.__grid.height):
                     if (self.__grid[x][y].type != States.WALL):
                         utility = self.__grid[x][y].reward + \
-                            MDPAgent.gamma * self.__calculate_MEU(x, y)
+                            MDPAgent.GAMMA * self.__calculate_MEU(x, y)
 
                         grid_copy[x][y].utility = utility
 
-                        if abs(self.__grid[x][y].utility - grid_copy[x][y].utility) > MDPAgent.threshold:
+                        if abs(self.__grid[x][y].utility - grid_copy[x][y].utility) > MDPAgent.THRESHOLD:
                             changes = True
 
             self.__grid = grid_copy
