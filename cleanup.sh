@@ -1,2 +1,2 @@
 #!/bin/sh
-rm **/*.pyc
+find . -name \*.pyc -delete
