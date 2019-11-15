@@ -1,6 +1,6 @@
 from copy import deepcopy, copy
 from collections import defaultdict
-from math import exp, sqrt
+from math import exp, sqrt, tanh
 
 from pacman import Directions
 from game import Agent
@@ -15,7 +15,7 @@ class States(object):
     Enum of possible board point states.
     '''
     PACMAN = 'PACMAN'
-    SPACE = 'SPACE'
+    EMPTY = 'EMPTY'
     WALL = 'WALL'
     CAPSULE = 'CAPSULE'
     FOOD = 'FOOD'
@@ -32,27 +32,33 @@ class Point(object):
         type (States): Current type, discribing the state of the point.
         reward (float): Current reward value of this point dependent on current type.
         utility (float): Current utility value of this point.
+        min_ghost_distance (int): 
     '''
 
     # Reward value for each state
     REWARDS = {
-        States.PACMAN: -0.04,
-        States.SPACE: -0.04,
+        # Neutral rewards
         States.WALL: 0,
-        States.CAPSULE: 2,
-        States.FOOD: 1,
-        States.GHOST_EDIBLE: -2,
+        # Negative rewards
+        States.EMPTY: -0.04,
+        States.PACMAN: -0.04,
         States.GHOST_HOSTILE: -5,
-        States.GHOST_NEIGHBOUR: -2
+        States.GHOST_EDIBLE: -2,
+        States.GHOST_NEIGHBOUR: -2,
+        # Positive rewards
+        States.CAPSULE: 5,
+        States.FOOD: 2,
     }
-    # Number of filled spaces on the board
-    FILL_COUNT = 0
-    # Scaling factor in reward function
-    GRID_SIZE = 1
-    # Maximum distance between any two points the board
-    MAX_DISTANCE = 0
+    # # Number of filled spaces on the board
+    # FILL_COUNT = 0
+    # # Scaling factor in reward function
+    # GRID_SIZE = 1
+    # # Maximum distance between any two points the board
+    # MAX_DISTANCE = 0
+    # # Radius around a ghost pacman should avoid
+    # GHOST_RADIUS = 1
 
-    def __init__(self, utility=None, type=States.SPACE):
+    def __init__(self, utility=None, type=States.EMPTY):
         '''
         Args:
             utility (int): Initial utility.
@@ -60,10 +66,18 @@ class Point(object):
         '''
         self.__utility = utility
         self.__type = type
-        self.min_ghost_distance = Point.MAX_DISTANCE
+        # self.min_ghost_distance = Point.MAX_DISTANCE
+
+    def __copy__(self):
+        return Point(utility=self.utility, type=self.__type)
 
     @property
     def utility(self):
+        '''
+        Returns:
+            Floating point number representing the points current utility
+            if set,  otherwise  returns the  default reward.
+        '''
         if self.__utility is None:
             return self.reward
         else:
@@ -75,10 +89,16 @@ class Point(object):
 
     @property
     def type(self):
-        if self.__type != States.WALL and \
-                self.__type != States.GHOST_HOSTILE and \
-                self.min_ghost_distance == 1:
-            return States.GHOST_NEIGHBOUR
+        '''
+        Returns:
+            String at out States enum, representing current state.  However, if
+            the  point is less than the ghost radius units away from any ghost,
+            the state  is overridden with States.GHOST_NEIGHBOUR.
+        '''
+        # if self.__type != States.WALL and \
+        #         self.__type != States.GHOST_HOSTILE and \
+        #         self.min_ghost_distance <= Point.GHOST_RADIUS:
+        #     return States.GHOST_NEIGHBOUR
 
         return self.__type
 
@@ -111,30 +131,31 @@ class Point(object):
         Returns:
             Float representing the points current reward value.
         '''
-        if self.type == States.WALL:
-            return Point.REWARDS[States.WALL]
+        # if self.type == States.WALL:
+        #     return Point.REWARDS[States.WALL]
 
-        if self.type == States.FOOD:
-            return Point.REWARDS[States.FOOD] * exp((Point.GRID_SIZE - Point.FILL_COUNT) / Point.GRID_SIZE) * exp(self.min_ghost_distance / Point.MAX_DISTANCE)
+        # if self.type == States.FOOD:
+        #     return Point.REWARDS[States.FOOD] * exp((Point.GRID_SIZE - Point.FILL_COUNT) / Point.GRID_SIZE) * exp(self.min_ghost_distance / Point.MAX_DISTANCE)
 
-        return Point.REWARDS[self.type] / exp(self.min_ghost_distance / Point.MAX_DISTANCE)
+        # return Point.REWARDS[self.type] / exp(self.min_ghost_distance / Point.MAX_DISTANCE)
+        return Point.REWARDS[self.type]
 
-    @staticmethod
-    def min_distance(x, y, items):
-        '''
-        Finds which item in the list of items is closest to (x, y), according
-        to manhattan distance. Then returns the  distance between the closest 
-        item and (x, y).
+    # @staticmethod
+    # def min_distance(x, y, items):
+    #     '''
+    #     Finds which item in the list of items is closest to (x, y), according
+    #     to manhattan distance. Then returns the  distance between the closest
+    #     item and (x, y).
 
-        Args:
-            x (int): X-coordinate of point
-            y (int): Y-coordinate of point
-            items (list): List of coordinates
+    #     Args:
+    #         x (int): X-coordinate of point
+    #         y (int): Y-coordinate of point
+    #         items (list): List of coordinates
 
-        Returns:
-            An integer representing the distance between closest item and (x, y).
-        '''
-        return min([util.manhattanDistance((x, y), item) for item in items])
+    #     Returns:
+    #         An integer representing the distance between closest item and (x, y).
+    #     '''
+    #     return min([util.manhattanDistance((x, y), item) for item in items])
 
 
 class Grid(object):
@@ -153,12 +174,19 @@ class Grid(object):
 
     def __init__(self):
         '''
-        Instantiates a grid of size Grid.Height * Grid.Width, or size 0 if either Grid.Height or 
+        Instantiates a grid of size Grid.Height * Grid.Width, or size 0 if either Grid.Height or
         Grid.Width doesn't exist.
         '''
         self.__grid = {
             (x, y): Point() for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH)
         }
+
+    def __deepcopy(self, memo):
+        grid_copy = Grid()
+        grid_copy._Grid__grid = {
+            key: copy(point) for key, point in self.__grid.items()
+        }
+        return grid_copy
 
     @classmethod
     def from_state(cls, state):
@@ -169,8 +197,8 @@ class Grid(object):
         grid._Grid__update_positions(state)
         return grid
 
-    def __getitem__(self, (x, y)):
-        return self.__grid[x, y]
+    def __getitem__(self, pos):
+        return self.__grid[pos]
 
     def __update_positions(self, state):
         '''
@@ -183,7 +211,7 @@ class Grid(object):
         Args:
             state: Current game state.
         '''
-        Point.FILL_COUNT = 0
+        # Point.FILL_COUNT = 0
 
         ghosts_with_times = [
             ((int(x), int(y)), time) for (x, y), time in api.ghostStatesWithTimes(state)
@@ -195,20 +223,24 @@ class Grid(object):
             States.PACMAN: [api.whereAmI(state)],
             States.WALL: api.walls(state),
             States.FOOD: api.food(state),
-            States.CAPSULE if max(ghost_times) < 3 else States.FOOD: api.capsules(state),
-            States.GHOST_HOSTILE: [ghost for ghost, time in ghosts_with_times if time < 3],
-            States.GHOST_EDIBLE: [ghost for ghost, time in ghosts_with_times if time > 2],
+            States.CAPSULE: api.capsules(state),
+            States.GHOST_HOSTILE: ghosts,
+            # States.GHOST_HOSTILE: [ghost for ghost, time in ghosts_with_times if time <= Point.GHOST_RADIUS],
+            # States.GHOST_EDIBLE: [ghost for ghost, time in ghosts_with_times if time > Point.GHOST_RADIUS],
         }
 
         for type, coords in points.items():
             for x, y in coords:
                 self[x, y].type = type
                 if type != States.WALL:
-                    self[x, y].min_ghost_distance = Point.min_distance(
-                        x, y, ghosts
-                    )
+                    pass
+                    # self[x, y].min_ghost_distance = Point.min_distance(
+                    #     x, y, ghosts
+                    # )
 
-                Point.FILL_COUNT += 1
+                    # Point.FILL_COUNT += 1
+
+                    # MDPAgent.GAMMA = tanh(Point.FOOD_COUNT) / 2
 
 
 class MDPAgent(Agent):
@@ -221,7 +253,7 @@ class MDPAgent(Agent):
     # Convergence threshold
     THRESHOLD = 0.01
     # Convergence iteration limit
-    ITERATION_LIMIT = 10
+    # ITERATION_LIMIT = 15
     # Gamma value in bellman equation
     GAMMA = 0.9
     # Directions mapped to displacement
@@ -249,8 +281,8 @@ class MDPAgent(Agent):
         '''
         Grid.HEIGHT = max([h for _, h in api.corners(state)]) + 1
         Grid.WIDTH = max([w for w, _ in api.corners(state)]) + 1
-        Point.GRID_SIZE = Grid.HEIGHT * Grid.WIDTH
-        Point.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
+        # Point.GRID_SIZE = Grid.HEIGHT * Grid.WIDTH
+        # Point.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
         # MDPAgent.ITERATION_LIMIT = sqrt(Grid.HEIGHT * Grid.WIDTH)
 
     @classmethod
@@ -289,16 +321,18 @@ class MDPAgent(Agent):
             A new grid containting updated utility values by performing value iteration
             on each point.
         '''
-        iterations = 0
-        while iterations < MDPAgent.ITERATION_LIMIT:
+        # threshold_break = False
+        # iterations = 0
+        while True:
             changes = False
             grid_copy = deepcopy(grid)
 
             for x in xrange(grid.WIDTH):
                 for y in xrange(grid.HEIGHT):
                     if grid[x, y].type != States.WALL and \
-                            grid[x, y].type != States.GHOST_HOSTILE and \
+                        grid[x, y].type != States.GHOST_HOSTILE and \
                             grid[x, y].type != States.GHOST_NEIGHBOUR:
+                        #         grid[x, y].type != States.FOOD:
                         utility = grid[x, y].reward + \
                             cls.GAMMA * cls.calculate_MEU(x, y, grid)
 
@@ -310,10 +344,13 @@ class MDPAgent(Agent):
             grid = grid_copy
 
             if not changes:
+                # threshold_break = True
                 break
-            else:
-                iterations += 1
+            # else:
+            #     iterations += 1
 
+        # print 'threshold break at: ' + \
+        #     str(iterations) if threshold_break else 'iteration break'
         return grid
 
     @classmethod
@@ -325,7 +362,7 @@ class MDPAgent(Agent):
             x (int): The x-coordinate.
             y (int): The y-coordinate.
             grid (Grid): Grid representing the game state.
-            legal ([Directions]): List of legal moves from current position
+            legal (list): List of legal moves from current position
             value (bool): Boolean value True if returning MEU value, False if
                 returning the corresponding move.
 
