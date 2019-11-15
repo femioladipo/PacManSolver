@@ -625,6 +625,7 @@ def replayGame( layout, actions, display ):
 
     display.finish()
 
+@util.timer(False)
 def runGames( layout, pacman, ghosts, display, numGames, record, numTraining = 0, catchExceptions=False, timeout=30 ):
     import __main__
     __main__.__dict__['_display'] = display

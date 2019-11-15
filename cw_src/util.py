@@ -31,6 +31,24 @@ import inspect
 import heapq, random
 import cStringIO
 
+###############################################
+################# CUSTOM ######################
+import time
+
+def timer(secs=True):
+    def wrapper(fn):
+        def wrapped_fn(*args, **kwargs):
+            start = time.time()
+            rv = fn(*args, **kwargs)
+            end = time.time()
+            if secs:
+                print end - start, 'secs'
+            else:
+                print (end - start)/60, 'mins'
+            return rv
+        return wrapped_fn
+    return wrapper
+###############################################
 
 class FixedRandom:
     def __init__(self):
