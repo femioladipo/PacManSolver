@@ -252,8 +252,8 @@ class MDPAgent(Agent):
     @classmethod
     def set_gamma(cls, x):
         '''
-        Using Richard's Curve to evenly distribute x, over the open interval (0.7, 1)
-        the set's gamma to this value.
+        Uses Richard's Curve to distribute x over the open interval (0.7, 1) in a sigmoid curve.
+        Then set's gamma to this value.
         '''
         K = 0.9  # upper asymptote
         A = 0.7  # lower asymptote
@@ -272,7 +272,6 @@ class MDPAgent(Agent):
         Grid.HEIGHT = max([h for _, h in api.corners(state)]) + 1
         Grid.WIDTH = max([w for w, _ in api.corners(state)]) + 1
         Grid.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
-        Grid.GHOST_RADIUS = ceil(min(Grid.HEIGHT, Grid.WIDTH) / 4.0)
         MDPAgent.ITERATION_LIMIT = ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
 
     @classmethod
