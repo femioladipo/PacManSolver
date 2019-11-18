@@ -1,13 +1,13 @@
 from copy import deepcopy, copy
 from collections import defaultdict
-from math import exp, sqrt, tanh, ceil
+from math import exp, sqrt, ceil
 from sys import maxint
 
 from pacman import Directions
 from game import Agent
 import api
-import random
-import game
+# import random
+# import game
 import util
 
 
@@ -33,7 +33,7 @@ class Point(object):
         type (States): Current type, discribing the state of the point.
         reward (float): Current reward value of this point dependent on current type.
         utility (float): Current utility value of this point.
-        min_ghost_distance (int): 
+        min_ghost_distance (int): Minimum manhattan distance from point to a ghost.
     '''
 
     # Reward value for each state
@@ -88,6 +88,7 @@ class Point(object):
             the  point is less than the ghost radius units away from any ghost,
             the state  is overridden with States.GHOST_NEIGHBOUR.
         '''
+        # TODO: ghost radius
         # if self.__type != States.WALL and \
         #         self.__type != States.GHOST_HOSTILE and \
         #         self.min_ghost_distance <= Point.GHOST_RADIUS:
@@ -102,24 +103,17 @@ class Point(object):
     @property
     def reward(self):
         '''
-        Will calculate the dynamic reward value if type is food, otherwise will return the default
-        reward value (defined statically on the class) for all other types.
+        Calculates and returns the shaped reward depending on the current state.
 
-            Dynamic Reward - FOOD
-            reward(f, gd) = d * e^(s - f / s) * e^(gd / md)
+            Dynamic Reward - Positive
+            reward(s) = d * f_phi / f_delta
             where:
                 d = default reward value
-                f = number of filled spaces
-                s = height * width
-                gd = minimum distance to a ghost
-                md = maximum distance of two board points
 
-            Dynamic Reward - NOT FOOD
-            reward(gd) = d / e^(gd / md)
+            Dynamic Reward - Negative
+            reward(s) = d * f_delta
             where:
                 d = default reward value
-                gd = minimum distance to a ghost
-                md = maximum distance of two board points
 
         Returns:
             Float representing the points current reward value.
@@ -128,10 +122,24 @@ class Point(object):
             return Point.REWARDS[self.type]
 
         if self.type in {States.FOOD, States.CAPSULE}:
-            return Point.REWARDS[self.type] * exp((Grid.size() - Grid.FILL_COUNT) / Grid.size()) * exp(self.min_ghost_distance / Grid.MAX_DISTANCE)
+            return Point.REWARDS[self.type] * self.f_phi() / self.f_delta()
 
-        return Point.REWARDS[self.type] / exp(self.min_ghost_distance / Grid.MAX_DISTANCE)
-        # return Point.REWARDS[self.type]
+        return Point.REWARDS[self.type] * self.f_delta()
+
+    def f_delta(self):
+        '''
+        Returns:
+            Value between 1 and e representing closeness to a ghost.
+        '''
+        return exp((Grid.MAX_DISTANCE - self.min_ghost_distance) / Grid.MAX_DISTANCE)
+
+    @staticmethod
+    def f_phi():
+        '''
+        Returns:
+            Value between 1 and e representing ratio of empty space to filled space.
+        '''
+        return exp((Grid.size() - Grid.FILL_COUNT) / Grid.size())
 
     @staticmethod
     def min_distance(x, y, items):
@@ -182,6 +190,10 @@ class Grid(object):
 
     @staticmethod
     def size():
+        '''
+        Returns:
+            Integer value representing number points on the grid.
+        '''
         return Grid.HEIGHT * Grid.WIDTH
 
     @classmethod
@@ -226,15 +238,14 @@ class Grid(object):
 
         for type, coords in points.items():
             for x, y in coords:
-                # Grid.FILL_COUNT += 1
+                Grid.FILL_COUNT += 1
                 self[x, y].type = type
                 if type != States.WALL:
                     self[x, y].min_ghost_distance = Point.min_distance(
                         x, y, ghosts
                     )
 
-        # x = len(api.food(state))
-        # MDPAgent.GAMMA = (x+3)/2*(x+1)
+        MDPAgent.set_gamma(len(api.food(state)) + len(api.capsules(state)))
 
 
 class MDPAgent(Agent):
@@ -244,8 +255,6 @@ class MDPAgent(Agent):
     resulting utility values.
     '''
 
-    # Convergence threshold
-    THRESHOLD = 0.01
     # Convergence iteration limit
     ITERATION_LIMIT = 15
     # Gamma value in bellman equation
@@ -264,6 +273,19 @@ class MDPAgent(Agent):
         Directions.SOUTH: [Directions.EAST, Directions.WEST],
         Directions.WEST: [Directions.NORTH, Directions.SOUTH]
     }
+
+    # TODO: variable gamma
+    @classmethod
+    def set_gamma(cls, x):
+        '''
+        Using Richard's Curve to evenly distribute x, over the open interval (0.7, 1)
+        the set's gamma to this value.
+        '''
+        K = 0.9  # upper asymptote
+        A = 0.7  # lower asymptote
+        B = -0.1  # growth rate
+        M = 5  # growth area midpoint
+        cls.GAMMA = A + (K-A) / (1 + exp(-B*(x-M)))
 
     @staticmethod
     def registerInitialState(state):
@@ -298,9 +320,7 @@ class MDPAgent(Agent):
 
         legal = api.legalActions(state)
 
-        move = cls.policy(x, y, grid, legal)
-
-        return api.makeMove(move, legal)
+        return api.makeMove(direction=cls.policy(x, y, grid, legal), legal=legal)
 
     @classmethod
     def value_iteration(cls, grid):
@@ -317,7 +337,6 @@ class MDPAgent(Agent):
         '''
         iterations = 0
         while iterations < MDPAgent.ITERATION_LIMIT:
-            changes = False
             grid_copy = deepcopy(grid)
 
             for x in xrange(grid.WIDTH):
@@ -325,22 +344,13 @@ class MDPAgent(Agent):
                     if grid[x, y].type != States.WALL and \
                             grid[x, y].type != States.GHOST_HOSTILE and \
                             grid[x, y].type != States.GHOST_NEIGHBOUR:
-                        #         grid[x, y].type != States.FOOD:
-                        utility = grid[x, y].reward + \
+                        grid_copy[x, y].utility = grid[x, y].reward + \
                             cls.GAMMA * \
                             cls.maximum_expected_utility(x, y, grid)
 
-                        grid_copy[x, y].utility = utility
-
-                        if abs(grid[x, y].utility - grid_copy[x, y].utility) > cls.THRESHOLD:
-                            changes = True
-
             grid = grid_copy
 
-            if not changes:
-                break
-            else:
-                iterations += 1
+            iterations += 1
 
         return grid
 
@@ -354,6 +364,9 @@ class MDPAgent(Agent):
             y (int): The y-coordinate.
             grid (Grid): Grid representing the game state.
             legal (list): List of legal moves from current position
+
+        Returns:
+            Direction representing the optimum policy from (x, y)
         '''
         return max([
             (utility, direction) for (direction, utility) in cls.expected_utilities(x, y, grid).items() if direction in legal
