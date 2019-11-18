@@ -6,8 +6,6 @@ from sys import maxint
 from pacman import Directions
 from game import Agent
 import api
-# import random
-# import game
 import util
 
 
@@ -58,11 +56,11 @@ class Point(object):
             type (States): Initial type.
         '''
         self.__utility = utility
-        self.__type = type
+        self.type = type
         self.min_ghost_distance = Grid.MAX_DISTANCE
 
     def __copy__(self):
-        return Point(utility=self.utility, type=self.__type)
+        return Point(utility=self.utility, type=self.type)
 
     @property
     def utility(self):
@@ -79,26 +77,6 @@ class Point(object):
     @utility.setter
     def utility(self, value):
         self.__utility = value
-
-    @property
-    def type(self):
-        '''
-        Returns:
-            String at out States enum, representing current state.  However, if
-            the  point is less than the ghost radius units away from any ghost,
-            the state  is overridden with States.GHOST_NEIGHBOUR.
-        '''
-        # TODO: ghost radius
-        # if self.__type != States.WALL and \
-        #         self.__type != States.GHOST_HOSTILE and \
-        #         self.min_ghost_distance <= Point.GHOST_RADIUS:
-        #     return States.GHOST_NEIGHBOUR
-
-        return self.__type
-
-    @type.setter
-    def type(self, value):
-        self.__type = value
 
     @property
     def reward(self):
@@ -415,6 +393,3 @@ class MDPAgent(Agent):
                 )
 
         return EU_values
-
-    def final(self, state):
-        pass
