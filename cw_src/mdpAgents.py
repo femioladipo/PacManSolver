@@ -1,7 +1,6 @@
-from copy import deepcopy, copy
+from copy import deepcopy
 from collections import defaultdict
 from math import exp, sqrt, ceil
-from sys import maxint
 
 from pacman import Directions
 from game import Agent
@@ -154,8 +153,6 @@ class Grid(object):
     MAX_DISTANCE = 0
     # Number of filled spaces on the board
     FILL_COUNT = 0
-    # Radius around a ghost pacman should avoid
-    GHOST_RADIUS = maxint
 
     def __init__(self):
         '''
@@ -252,7 +249,6 @@ class MDPAgent(Agent):
         Directions.WEST: [Directions.NORTH, Directions.SOUTH]
     }
 
-    # TODO: variable gamma
     @classmethod
     def set_gamma(cls, x):
         '''
