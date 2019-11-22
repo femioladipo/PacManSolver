@@ -45,7 +45,7 @@ class Point(object):
         States.FOOD: 2,
     }
 
-    def __init__(self, utility=None, type=States.EMPTY, min_distance=None):
+    def __init__(self, utility=None, type=States.EMPTY, min_ghost_distance=None):
         '''
         Args:
             utility (int): Initial utility.
@@ -53,10 +53,10 @@ class Point(object):
         '''
         self.__utility = utility
         self.__type = type
-        self.min_ghost_distance = min_distance or Grid.MAX_DISTANCE
+        self.min_ghost_distance = min_ghost_distance or Grid.MAX_DISTANCE
 
     def __copy__(self):
-        return Point(utility=self.utility, type=self.type, min_distance=self.min_distance)
+        return Point(utility=self.utility, type=self.type, min_ghost_distance=self.min_distance)
 
     @property
     def utility(self):
