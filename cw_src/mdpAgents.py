@@ -50,20 +50,37 @@ class Point(object):
         Args:
             utility (int): Initial utility.
             type (States): Initial type.
+            min_ghost_distance (int): Manhattan distance to closest ghost
         '''
         self.__utility = utility
         self.__type = type
-        self.min_ghost_distance = min_ghost_distance or Grid.MAX_DISTANCE
+        self.__min_ghost_distance = min_ghost_distance
 
     def __copy__(self):
-        return Point(utility=self.utility, type=self.type, min_ghost_distance=self.min_distance)
+        return Point(utility=self.__utility, type=self.__type, min_ghost_distance=self.__min_ghost_distance)
+
+    @property
+    def min_ghost_distance(self):
+        '''
+        Returns:
+            Integer representing manhattan distance to closest ghost, or max grid distance
+            if not set.
+        '''
+        if self.__min_ghost_distance is None:
+            return Grid.MAX_DISTANCE
+        else:
+            return self.__min_ghost_distance
+
+    @min_ghost_distance.setter
+    def min_ghost_distance(self, value):
+        self.__min_ghost_distance = value
 
     @property
     def utility(self):
         '''
         Returns:
-            Floating point number representing the points current utility
-            if set,  otherwise  returns the  default reward.
+            Floating point number representing the points current utility if
+            set, otherwise returns the default reward.
         '''
         if self.__utility is None:
             return self.reward
@@ -79,12 +96,10 @@ class Point(object):
         '''
         Returns:
             String at out States enum, representing current state.  However, if
-            the  point is less than the ghost radius units away from any ghost,
+            the point is less than the ghost radius units away from any ghost,
             the state  is overridden with States.GHOST_NEIGHBOUR.
         '''
-        if Grid.GHOST_RADIUS is not None and \
-                self.__type != States.GHOST_EDIBLE and \
-                self.__type != States.GHOST_HOSTILE and \
+        if self.__type not in {States.GHOST_EDIBLE, States.GHOST_HOSTILE} and \
                 self.min_ghost_distance <= Grid.GHOST_RADIUS:
             return States.GHOST_NEIGHBOUR
 
@@ -163,8 +178,10 @@ class Grid(object):
     MAX_DISTANCE = 0
     # Number of filled spaces on the board
     FILL_COUNT = 0
+    # Amount of time remaining in edible mode, where ghosts are still considered safe
+    GHOST_SAFE_TIME = 3
     # Radius around ghosts pacman should avoid
-    GHOST_RADIUS = None
+    GHOST_RADIUS = 0
     # Walls for the current grid
     WALLS = set()
 
@@ -175,7 +192,7 @@ class Grid(object):
 
         Instantiates a new grid from a game state, setting the relevant board elements.
         '''
-        self.__grid = self.__grid = {
+        self.__grid = {
             (x, y): Point() for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH) if (x, y) not in Grid.WALLS
         }
         self.__update_positions(state)
@@ -192,7 +209,7 @@ class Grid(object):
         return self.__grid[coordinate]
 
     def __iter__(self):
-        return self.__grid.iteritems()
+        return self.__grid.iterkeys()
 
     def __contains__(self, coordinate):
         return coordinate in self.__grid
@@ -210,24 +227,21 @@ class Grid(object):
         '''
         Grid.FILL_COUNT = 0
 
-        ghosts_with_times = [
-            ((int(x), int(y)), time) for (x, y), time in api.ghostStatesWithTimes(state)
-        ]
         points = {
             States.PACMAN: [api.whereAmI(state)],
             States.FOOD: api.food(state),
             States.CAPSULE: api.capsules(state),
-            States.GHOST_HOSTILE: [ghost for ghost, time in ghosts_with_times if Grid.GHOST_RADIUS is None or time <= Grid.GHOST_RADIUS],
-            States.GHOST_EDIBLE: [ghost for ghost, time in ghosts_with_times if Grid.GHOST_RADIUS is not None and time > Grid.GHOST_RADIUS],
+            States.GHOST_HOSTILE: [ghost for ghost, time in api.ghostStatesWithTimes(state) if time <= Grid.GHOST_SAFE_TIME],
+            States.GHOST_EDIBLE: [ghost for ghost, time in api.ghostStatesWithTimes(state) if time > Grid.GHOST_SAFE_TIME],
         }
 
-        ghosts = [ghost for ghost, _ in ghosts_with_times]
         for type, coords in points.items():
             for x, y in coords:
+                x, y = map(int, [x, y])
                 Grid.FILL_COUNT += 1
                 self[x, y].type = type
                 self[x, y].min_ghost_distance = Point.min_distance(
-                    x, y, ghosts
+                    x, y, api.ghosts(state)
                 )
 
         MDPAgent.set_gamma(len(api.food(state)) + len(api.capsules(state)))
@@ -262,7 +276,7 @@ class MDPAgent(Agent):
     @classmethod
     def set_gamma(cls, x):
         '''
-        Uses Richard's Curve to distribute x over the open interval (0.7, 1) in a sigmoid curve.
+        Uses Richard's Curve to distribute x over the open interval (0.6, 1) in a sigmoid curve.
         Then set's gamma to this value.
         '''
         K = 1  # upper asymptote
@@ -282,8 +296,8 @@ class MDPAgent(Agent):
         '''
         Grid.HEIGHT = max([h for _, h in api.corners(state)]) + 1
         Grid.WIDTH = max([w for w, _ in api.corners(state)]) + 1
-        if (Grid.WIDTH, Grid.HEIGHT) == (20, 11):
-            Grid.GHOST_RADIUS = 2
+        if Grid.WIDTH > 7 and Grid.HEIGHT > 7:
+            Grid.GHOST_RADIUS = 3
         Grid.WALLS = set(api.walls(state))
         Grid.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
         MDPAgent.ITERATION_LIMIT = ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
@@ -323,12 +337,13 @@ class MDPAgent(Agent):
             on each point.
         '''
         iterations = 0
+
         while iterations < MDPAgent.ITERATION_LIMIT:
             grid_copy = deepcopy(grid)
 
-            for (x, y), point in grid:
-                if point.type != States.GHOST_HOSTILE:
-                    grid[x, y].utility = point.reward + \
+            for (x, y) in grid:
+                if grid[x, y].type != States.GHOST_HOSTILE:
+                    grid[x, y].utility = grid[x, y].reward + \
                         cls.GAMMA * \
                         cls.maximum_expected_utility(x, y, grid_copy)
 
