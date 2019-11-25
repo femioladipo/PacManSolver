@@ -5,7 +5,7 @@ from math import exp, sqrt, ceil
 from pacman import Directions
 from game import Agent
 import api
-import util
+from util import manhattanDistance
 
 
 class States(object):
@@ -162,7 +162,7 @@ class Point(object):
         Returns:
             An integer representing the distance between closest item and (x, y).
         '''
-        return min([util.manhattanDistance((x, y), item) for item in items])
+        return min([manhattanDistance((x, y), item) for item in items])
 
 
 class Grid(object):
@@ -237,14 +237,14 @@ class Grid(object):
 
         for type, coords in points.items():
             for x, y in coords:
-                x, y = map(int, [x, y])
                 Grid.FILL_COUNT += 1
+                x, y = map(int, [x, y])  # because ghost coords are floats
                 self[x, y].type = type
                 self[x, y].min_ghost_distance = Point.min_distance(
                     x, y, api.ghosts(state)
                 )
 
-        MDPAgent.set_gamma(len(api.food(state)) + len(api.capsules(state)))
+        MDPAgent.set_gamma(len(api.food(state) + api.capsules(state)))
 
 
 class MDPAgent(Agent):
@@ -341,7 +341,7 @@ class MDPAgent(Agent):
         while iterations < MDPAgent.ITERATION_LIMIT:
             grid_copy = deepcopy(grid)
 
-            for (x, y) in grid:
+            for x, y in grid:
                 if grid[x, y].type != States.GHOST_HOSTILE:
                     grid[x, y].utility = grid[x, y].reward + \
                         cls.GAMMA * \
@@ -398,16 +398,16 @@ class MDPAgent(Agent):
             Dictionary mapping directions to their utility values.
         '''
         EU_values = defaultdict(int)
-        position = grid[x, y]
 
         for main_direction, displacement in cls.DIRECTIONS.items():
             main_direction_prob = [(displacement, api.directionProb)]
             non_deterministic_directions_prob = [
                 (cls.DIRECTIONS[direction], (1-api.directionProb)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
             ]
+            # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
             for (dx, dy), prob in main_direction_prob + non_deterministic_directions_prob:
                 if (x+dx, y+dy) in Grid.WALLS:
-                    EU_values[main_direction] += prob * position.utility
+                    EU_values[main_direction] += prob * grid[x, y].utility
                 else:
                     EU_values[main_direction] += prob * \
                         grid[x+dx, y+dy].utility
