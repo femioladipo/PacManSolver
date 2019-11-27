@@ -1,11 +1,63 @@
 from copy import deepcopy
 from collections import defaultdict
 from math import exp, sqrt, ceil
+from re import sub
 
 from pacman import Directions
 from game import Agent
 import api
-from util import manhattanDistance
+import util
+
+
+################## Fixing camel casing to comply with PEP8 ####################
+def snake_to_camel(term):
+    '''
+    Converts a snake case string to a camel case version of the same string.
+
+    Args:
+        term (str): Word to camel case
+
+    Returns:
+        Camel cased version of term
+    '''
+    return ''.join(item if i == 0 else item.capitalize() for i, item in enumerate(term.split('_')))
+
+
+def camel_to_snake(term):
+    '''
+    Converts a camel case string to a snake case version of the same string.
+
+    Args:
+        term (str): Word to snake case
+
+    Returns:
+        Snake cased version of term
+    '''
+    tmp = sub('(.)([A-Z][a-z]+)', r'\1_\2', term)
+    return sub('([a-z0-9])([A-Z])', r'\1_\2', tmp).lower()
+
+
+def camel_case(original):
+    '''
+    Used on a class to alias every method with a camel case version.
+    '''
+    for name, method_or_value in original.__dict__.copy().iteritems():
+        setattr(original, snake_to_camel(name), method_or_value)
+    return original
+
+
+def snake_case(original):
+    '''
+    Used on a class to alias every method with a snake case version.
+    '''
+    for name, method in original.__dict__.copy().iteritems():
+        setattr(original, camel_to_snake(name), method)
+    return original
+
+
+snake_case(util)
+snake_case(api)
+###############################################################################
 
 
 class States(object):
@@ -162,7 +214,7 @@ class Point(object):
         Returns:
             An integer representing the distance between closest item and (x, y).
         '''
-        return min([manhattanDistance((x, y), item) for item in items])
+        return min([util.manhattan_distance((x, y), item) for item in items])
 
 
 class Grid(object):
@@ -209,6 +261,10 @@ class Grid(object):
         return self.__grid[coordinate]
 
     def __iter__(self):
+        '''
+        Allow iteration through the keys (in this case coordinates) of the grid,
+        using the 'for key in Grid' syntax.
+        '''
         return self.__grid.iterkeys()
 
     def __contains__(self, coordinate):
@@ -228,11 +284,11 @@ class Grid(object):
         Grid.FILL_COUNT = 0
 
         points = {
-            States.PACMAN: [api.whereAmI(state)],
+            States.PACMAN: [api.where_am_i(state)],
             States.FOOD: api.food(state),
             States.CAPSULE: api.capsules(state),
-            States.GHOST_HOSTILE: [ghost for ghost, time in api.ghostStatesWithTimes(state) if time <= Grid.GHOST_SAFE_TIME],
-            States.GHOST_EDIBLE: [ghost for ghost, time in api.ghostStatesWithTimes(state) if time > Grid.GHOST_SAFE_TIME],
+            States.GHOST_HOSTILE: [ghost for ghost, time in api.ghost_states_with_times(state) if time <= Grid.GHOST_SAFE_TIME],
+            States.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
         }
 
         for type, coords in points.items():
@@ -247,6 +303,7 @@ class Grid(object):
         MDPAgent.set_gamma(len(api.food(state) + api.capsules(state)))
 
 
+@camel_case
 class MDPAgent(Agent):
     '''
     The MDPAgent the calculates the new utility values, using value interation
@@ -286,7 +343,7 @@ class MDPAgent(Agent):
         cls.GAMMA = A + (K-A) / (1 + exp(-B*(x-M)))
 
     @staticmethod
-    def registerInitialState(state):
+    def register_initial_state(state):
         '''
         Sets Grid and Point classes' static constants dependant on state, and
         MDPAgent.ITERATION_LIMIT.
@@ -303,7 +360,7 @@ class MDPAgent(Agent):
         MDPAgent.ITERATION_LIMIT = ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
 
     @classmethod
-    def getAction(cls, state):
+    def get_action(cls, state):
         '''
         Picks the best next move dependent on state.
 
@@ -317,11 +374,11 @@ class MDPAgent(Agent):
 
         grid = cls.value_iteration(grid)
 
-        x, y = api.whereAmI(state)
+        x, y = api.where_am_i(state)
 
-        legal = api.legalActions(state)
+        legal = api.legal_actions(state)
 
-        return api.makeMove(direction=cls.policy(x, y, grid, legal), legal=legal)
+        return api.make_move(direction=cls.policy(x, y, grid, legal), legal=legal)
 
     @classmethod
     def value_iteration(cls, grid):
@@ -397,19 +454,20 @@ class MDPAgent(Agent):
         Returns:
             Dictionary mapping directions to their utility values.
         '''
-        EU_values = defaultdict(int)
+        expected_utility_values = defaultdict(int)
 
         for main_direction, displacement in cls.DIRECTIONS.items():
-            main_direction_prob = [(displacement, api.directionProb)]
+            main_direction_prob = [(displacement, api.direction_prob)]
             non_deterministic_directions_prob = [
-                (cls.DIRECTIONS[direction], (1-api.directionProb)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
+                (cls.DIRECTIONS[direction], (1-api.direction_prob)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
             ]
             # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
             for (dx, dy), prob in main_direction_prob + non_deterministic_directions_prob:
-                if (x+dx, y+dy) in Grid.WALLS:
-                    EU_values[main_direction] += prob * grid[x, y].utility
-                else:
-                    EU_values[main_direction] += prob * \
+                if (x+dx, y+dy) in grid:
+                    expected_utility_values[main_direction] += prob * \
                         grid[x+dx, y+dy].utility
+                else:
+                    expected_utility_values[main_direction] += prob * \
+                        grid[x, y].utility
 
-        return EU_values
+        return expected_utility_values
