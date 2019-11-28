@@ -50,8 +50,8 @@ def snake_case(original):
     '''
     Used on a class to alias every method with a snake case version.
     '''
-    for name, method in original.__dict__.copy().iteritems():
-        setattr(original, camel_to_snake(name), method)
+    for name, method_or_value in original.__dict__.copy().iteritems():
+        setattr(original, camel_to_snake(name), method_or_value)
     return original
 
 
@@ -233,7 +233,7 @@ class Grid(object):
     # Amount of time remaining in edible mode, where ghosts are still considered safe
     GHOST_SAFE_TIME = 3
     # Radius around ghosts pacman should avoid
-    GHOST_RADIUS = 0
+    GHOST_RADIUS = 1
     # Walls for the current grid
     WALLS = set()
 
@@ -262,12 +262,21 @@ class Grid(object):
 
     def __iter__(self):
         '''
-        Allow iteration through the keys (in this case coordinates) of the grid,
-        using the 'for key in Grid' syntax.
+        Allows iteration through the coordinates and points of the grid,
+        using the 'for coordinate, point in Grid' syntax.
         '''
-        return self.__grid.iterkeys()
+        return self.__grid.iteritems()
 
     def __contains__(self, coordinate):
+        '''
+        Checks if coordinate is in the grid.
+
+        Args:
+            coordinate (2-tuple): (x,y) coordinates of position to check for.
+
+        Returns:
+            Bool that is true if coordinate is in the grid, or false otherwise.
+        '''
         return coordinate in self.__grid
 
     def __update_positions(self, state):
@@ -372,16 +381,16 @@ class MDPAgent(Agent):
         '''
         grid = Grid(state)
 
-        grid = cls.value_iteration(grid)
+        grid = cls.__value_iteration(grid)
 
         x, y = api.where_am_i(state)
 
         legal = api.legal_actions(state)
 
-        return api.make_move(direction=cls.policy(x, y, grid, legal), legal=legal)
+        return api.make_move(direction=cls.__policy(x, y, grid, legal), legal=legal)
 
     @classmethod
-    def value_iteration(cls, grid):
+    def __value_iteration(cls, grid):
         '''
         Calculates and sets new utility values for every point on the grid, repeating
         until MDPAgent.ITERATION_LIMIT is reached.
@@ -398,18 +407,18 @@ class MDPAgent(Agent):
         while iterations < MDPAgent.ITERATION_LIMIT:
             grid_copy = deepcopy(grid)
 
-            for x, y in grid:
-                if grid[x, y].type != States.GHOST_HOSTILE:
-                    grid[x, y].utility = grid[x, y].reward + \
+            for (x, y), point in grid:
+                if point.type != States.GHOST_HOSTILE:
+                    point.utility = point.reward + \
                         cls.GAMMA * \
-                        cls.maximum_expected_utility(x, y, grid_copy)
+                        cls.__maximum_expected_utility(x, y, grid_copy)
 
             iterations += 1
 
         return grid
 
     @classmethod
-    def policy(cls, x, y, grid, legal):
+    def __policy(cls, x, y, grid, legal):
         '''
         Finds the best policy from position (x, y), that's also included in legal moves.
 
@@ -423,11 +432,11 @@ class MDPAgent(Agent):
             Direction representing the optimum policy from (x, y)
         '''
         return max([
-            (utility, direction) for (direction, utility) in cls.expected_utilities(x, y, grid).items() if direction in legal
+            (utility, direction) for (direction, utility) in cls.__expected_utilities(x, y, grid).iteritems() if direction in legal
         ])[1]
 
     @classmethod
-    def maximum_expected_utility(cls, x, y, grid):
+    def __maximum_expected_utility(cls, x, y, grid):
         '''
         Calculates and returns the maximum expected utility at (x, y).
 
@@ -439,10 +448,10 @@ class MDPAgent(Agent):
         Returns:
             Floating point number representing maximum expected utility.
         '''
-        return max(cls.expected_utilities(x, y, grid).values())
+        return max(cls.__expected_utilities(x, y, grid).values())
 
     @classmethod
-    def expected_utilities(cls, x, y, grid):
+    def __expected_utilities(cls, x, y, grid):
         '''
         Calculates the expected utility for moving in each direction from (x, y).
 
@@ -454,9 +463,9 @@ class MDPAgent(Agent):
         Returns:
             Dictionary mapping directions to their utility values.
         '''
-        expected_utility_values = defaultdict(int)
+        expected_utilities = defaultdict(int)
 
-        for main_direction, displacement in cls.DIRECTIONS.items():
+        for main_direction, displacement in cls.DIRECTIONS.iteritems():
             main_direction_prob = [(displacement, api.direction_prob)]
             non_deterministic_directions_prob = [
                 (cls.DIRECTIONS[direction], (1-api.direction_prob)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
@@ -464,10 +473,10 @@ class MDPAgent(Agent):
             # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
             for (dx, dy), prob in main_direction_prob + non_deterministic_directions_prob:
                 if (x+dx, y+dy) in grid:
-                    expected_utility_values[main_direction] += prob * \
+                    expected_utilities[main_direction] += prob * \
                         grid[x+dx, y+dy].utility
                 else:
-                    expected_utility_values[main_direction] += prob * \
+                    expected_utilities[main_direction] += prob * \
                         grid[x, y].utility
 
-        return expected_utility_values
+        return expected_utilities
