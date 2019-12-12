@@ -481,8 +481,8 @@ class MDPAgent(Agent):
                 (cls.DIRECTIONS[direction], (1-api.direction_prob)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
             ]
             # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
-            for deltas, prob in main_direction_prob + non_deterministic_directions_prob:
-                if coordinate+deltas in grid:
+            for displacement, prob in main_direction_prob + non_deterministic_directions_prob:
+                if coordinate+displacement in grid:
                     expected_utilities[main_direction] += prob * \
                         grid[coordinate+deltas].utility
                 else:
