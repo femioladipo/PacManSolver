@@ -60,20 +60,18 @@ snake_case(api)
 ###############################################################################
 
 
-class Coodinate(tuple):
+class Coordinate(tuple):
+    '''
+    Tuple wrapper ensuring: size is 2, x & y are ints and enabling easy addition.
+    '''
     def __new__(cls, x, y):
-        return super(Coodinate, cls).__new__(cls, (x, y))
-
-    @property
-    def x(self):
-        return self[0]
-
-    @property
-    def y(self):
-        return self[1]
+        return super(Coordinate, cls).__new__(cls, (int(x), int(y)))
 
     def __add__(self, other):
-        return Coodinate(self.x+other.x, self.y+other.y)
+        return Coordinate(x=self[0]+other[0], y=self[1]+other[1])
+
+    def __deepcopy__(self, memo):
+        return Coordinate(x=self[0], y=self[1])
 
 
 class Dispositions(object):
@@ -216,21 +214,20 @@ class Point(object):
         return exp((Grid.size() - Grid.FILL_COUNT) / Grid.size())
 
     @staticmethod
-    def min_distance(x, y, items):
+    def min_distance(coordinate, items):
         '''
         Finds which item in the list of items is closest to (x, y), according
         to manhattan distance. Then returns the  distance between the closest
         item and (x, y).
 
         Args:
-            x (int): X-coordinate of point
-            y (int): Y-coordinate of point
+            coordinate (Coordinate): (x, y) coordinate of the point
             items (list): List of coordinates
 
         Returns:
-            An integer representing the distance between closest item and (x, y).
+            An integer representing the distance between closest item and the coordinate.
         '''
-        return min([util.manhattan_distance((x, y), item) for item in items])
+        return min([util.manhattan_distance(coordinate, item) for item in items])
 
 
 class Grid(object):
@@ -261,7 +258,7 @@ class Grid(object):
         Instantiates a new grid from a game state, setting the relevant board elements.
         '''
         self.__grid = {
-            (x, y): Point() for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH) if (x, y) not in Grid.WALLS
+            Coordinate(x, y): Point() for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH) if (x, y) not in Grid.WALLS
         }
         self.__update_positions(state)
 
@@ -316,13 +313,13 @@ class Grid(object):
             Dispositions.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
         }
 
-        for disposition, coords in points.items():
-            for x, y in coords:
+        for disposition, coordinates in points.items():
+            for x, y in coordinates:
                 Grid.FILL_COUNT += 1
-                x, y = map(int, [x, y])  # because ghost coords are floats
-                self[x, y].disposition = disposition
-                self[x, y].min_ghost_distance = Point.min_distance(
-                    x, y, api.ghosts(state)
+                coordinate = Coordinate(x, y)
+                self[coordinate].disposition = disposition
+                self[coordinate].min_ghost_distance = Point.min_distance(
+                    coordinate, api.ghosts(state)
                 )
 
         MDPAgent.set_gamma(len(api.food(state) + api.capsules(state)))
@@ -342,10 +339,10 @@ class MDPAgent(Agent):
     GAMMA = 0.9
     # Directions mapped to displacement
     DIRECTIONS = {
-        Directions.NORTH: (0, 1),
-        Directions.EAST: (1, 0),
-        Directions.SOUTH: (0, -1),
-        Directions.WEST: (-1, 0)
+        Directions.NORTH: Coordinate(0, 1),
+        Directions.EAST: Coordinate(1, 0),
+        Directions.SOUTH: Coordinate(0, -1),
+        Directions.WEST: Coordinate(-1, 0)
     }
     # Directions mapped to list of left and right directions
     NON_DETERMINISTIC_DIRECTIONS = {
@@ -399,11 +396,11 @@ class MDPAgent(Agent):
 
         grid = cls.__value_iteration(grid)
 
-        x, y = api.where_am_i(state)
+        coodinate = Coordinate(*api.where_am_i(state))
 
         legal = api.legal_actions(state)
 
-        return api.make_move(direction=cls.__policy(x, y, grid, legal), legal=legal)
+        return api.make_move(direction=cls.__policy(coodinate, grid, legal), legal=legal)
 
     @classmethod
     def __value_iteration(cls, grid):
@@ -423,24 +420,23 @@ class MDPAgent(Agent):
         while iterations < MDPAgent.ITERATION_LIMIT:
             grid_copy = deepcopy(grid)
 
-            for (x, y), point in grid:
+            for coordinate, point in grid:
                 if point.disposition != Dispositions.GHOST_HOSTILE:
                     point.utility = point.reward + \
                         cls.GAMMA * \
-                        cls.__maximum_expected_utility(x, y, grid_copy)
+                        cls.__maximum_expected_utility(coordinate, grid_copy)
 
             iterations += 1
 
         return grid
 
     @classmethod
-    def __policy(cls, x, y, grid, legal):
+    def __policy(cls, coordinate, grid, legal):
         '''
         Finds the best policy from position (x, y), that's also included in legal moves.
 
         Args:
-            x (int): The x-coordinate.
-            y (int): The y-coordinate.
+            coordinate (Coordinate): (x, y) coordinate of the point
             grid (Grid): Grid representing the game state.
             legal (list): List of legal moves from current position
 
@@ -448,32 +444,30 @@ class MDPAgent(Agent):
             Direction representing the optimum policy from (x, y)
         '''
         return max([
-            (utility, direction) for (direction, utility) in cls.__expected_utilities(x, y, grid).iteritems() if direction in legal
+            (utility, direction) for (direction, utility) in cls.__expected_utilities(coordinate, grid).iteritems() if direction in legal
         ])[1]
 
     @classmethod
-    def __maximum_expected_utility(cls, x, y, grid):
+    def __maximum_expected_utility(cls, coordinate, grid):
         '''
         Calculates and returns the maximum expected utility at (x, y).
 
         Args:
-            x (int): The x-coordinate.
-            y (int): The y-coordinate.
+            coordinate (Coordinate): (x, y) coordinate of the point
             grid (Grid): Grid representing the game state.
 
         Returns:
             Floating point number representing maximum expected utility.
         '''
-        return max(cls.__expected_utilities(x, y, grid).values())
+        return max(cls.__expected_utilities(coordinate, grid).values())
 
     @classmethod
-    def __expected_utilities(cls, x, y, grid):
+    def __expected_utilities(cls, coordinate, grid):
         '''
         Calculates the expected utility for moving in each direction from (x, y).
 
         Args:
-            x (int): The x-coordinate.
-            y (int): The y-coordinate.
+            coordinate (Coordinate): (x, y) coordinate of the point
             grid (Grid): Grid representing the game state.
 
         Returns:
@@ -487,12 +481,12 @@ class MDPAgent(Agent):
                 (cls.DIRECTIONS[direction], (1-api.direction_prob)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
             ]
             # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
-            for (dx, dy), prob in main_direction_prob + non_deterministic_directions_prob:
-                if (x+dx, y+dy) in grid:
+            for deltas, prob in main_direction_prob + non_deterministic_directions_prob:
+                if coordinate+deltas in grid:
                     expected_utilities[main_direction] += prob * \
-                        grid[x+dx, y+dy].utility
+                        grid[coordinate+deltas].utility
                 else:
                     expected_utilities[main_direction] += prob * \
-                        grid[x, y].utility
+                        grid[coordinate].utility
 
         return expected_utilities
