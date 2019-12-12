@@ -484,7 +484,7 @@ class MDPAgent(Agent):
             for displacement, prob in main_direction_prob + non_deterministic_directions_prob:
                 if coordinate+displacement in grid:
                     expected_utilities[main_direction] += prob * \
-                        grid[coordinate+deltas].utility
+                        grid[coordinate+displacement].utility
                 else:
                     expected_utilities[main_direction] += prob * \
                         grid[coordinate].utility
