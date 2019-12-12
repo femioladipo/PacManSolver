@@ -60,7 +60,23 @@ snake_case(api)
 ###############################################################################
 
 
-class States(object):
+class Coodinate(tuple):
+    def __new__(cls, x, y):
+        return super(Coodinate, cls).__new__(cls, (x, y))
+
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
+    def __add__(self, other):
+        return Coodinate(self.x+other.x, self.y+other.y)
+
+
+class Dispositions(object):
     '''
     Enum of possible board point states.
     '''
@@ -78,8 +94,8 @@ class Point(object):
     A single point on the board.
 
     Attributes:
-        type (States): Current type, discribing the state of the point.
-        reward (float): Current reward value of this point dependent on current type.
+        disposition (Dispositions): Current disposition, discribing the state of the point.
+        reward (float): Current reward value of this point dependent on current disposition.
         utility (float): Current utility value of this point.
         min_ghost_distance (int): Minimum manhattan distance from point to a ghost.
     '''
@@ -87,29 +103,29 @@ class Point(object):
     # Reward value for each state
     REWARDS = {
         # Negative rewards
-        States.EMPTY: -0.04,
-        States.PACMAN: -0.04,
-        States.GHOST_HOSTILE: -5,
-        States.GHOST_EDIBLE: -2,
-        States.GHOST_NEIGHBOUR: -2,
+        Dispositions.EMPTY: -0.04,
+        Dispositions.PACMAN: -0.04,
+        Dispositions.GHOST_HOSTILE: -5,
+        Dispositions.GHOST_EDIBLE: -2,
+        Dispositions.GHOST_NEIGHBOUR: -2,
         # Positive rewards
-        States.CAPSULE: 5,
-        States.FOOD: 2,
+        Dispositions.CAPSULE: 5,
+        Dispositions.FOOD: 2,
     }
 
-    def __init__(self, utility=None, type=States.EMPTY, min_ghost_distance=None):
+    def __init__(self, utility=None, disposition=Dispositions.EMPTY, min_ghost_distance=None):
         '''
         Args:
             utility (int): Initial utility.
-            type (States): Initial type.
+            disposition (Dispositions): Initial disposition.
             min_ghost_distance (int): Manhattan distance to closest ghost
         '''
         self.__utility = utility
-        self.__type = type
+        self.__disposition = disposition
         self.__min_ghost_distance = min_ghost_distance
 
     def __copy__(self):
-        return Point(utility=self.__utility, type=self.__type, min_ghost_distance=self.__min_ghost_distance)
+        return Point(utility=self.__utility, disposition=self.__disposition, min_ghost_distance=self.__min_ghost_distance)
 
     @property
     def min_ghost_distance(self):
@@ -144,22 +160,22 @@ class Point(object):
         self.__utility = value
 
     @property
-    def type(self):
+    def disposition(self):
         '''
         Returns:
-            String at out States enum, representing current state.  However, if
+            String at out Dispositions enum, representing current state.  However, if
             the point is less than the ghost radius units away from any ghost,
-            the state  is overridden with States.GHOST_NEIGHBOUR.
+            the state  is overridden with Dispositions.GHOST_NEIGHBOUR.
         '''
-        if self.__type not in {States.GHOST_EDIBLE, States.GHOST_HOSTILE} and \
+        if self.__disposition not in {Dispositions.GHOST_EDIBLE, Dispositions.GHOST_HOSTILE} and \
                 self.min_ghost_distance <= Grid.GHOST_RADIUS:
-            return States.GHOST_NEIGHBOUR
+            return Dispositions.GHOST_NEIGHBOUR
 
-        return self.__type
+        return self.__disposition
 
-    @type.setter
-    def type(self, value):
-        self.__type = value
+    @disposition.setter
+    def disposition(self, value):
+        self.__disposition = value
 
     @property
     def reward(self):
@@ -179,10 +195,10 @@ class Point(object):
         Returns:
             Float representing the points current reward value.
         '''
-        if self.type in {States.FOOD, States.CAPSULE}:
-            return Point.REWARDS[self.type] * self.f_phi() / self.f_delta()
+        if self.disposition in {Dispositions.FOOD, Dispositions.CAPSULE}:
+            return Point.REWARDS[self.disposition] * self.f_phi() / self.f_delta()
 
-        return Point.REWARDS[self.type] * self.f_delta()
+        return Point.REWARDS[self.disposition] * self.f_delta()
 
     def f_delta(self):
         '''
@@ -293,18 +309,18 @@ class Grid(object):
         Grid.FILL_COUNT = 0
 
         points = {
-            States.PACMAN: [api.where_am_i(state)],
-            States.FOOD: api.food(state),
-            States.CAPSULE: api.capsules(state),
-            States.GHOST_HOSTILE: [ghost for ghost, time in api.ghost_states_with_times(state) if time <= Grid.GHOST_SAFE_TIME],
-            States.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
+            Dispositions.PACMAN: [api.where_am_i(state)],
+            Dispositions.FOOD: api.food(state),
+            Dispositions.CAPSULE: api.capsules(state),
+            Dispositions.GHOST_HOSTILE: [ghost for ghost, time in api.ghost_states_with_times(state) if time <= Grid.GHOST_SAFE_TIME],
+            Dispositions.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
         }
 
-        for type, coords in points.items():
+        for disposition, coords in points.items():
             for x, y in coords:
                 Grid.FILL_COUNT += 1
                 x, y = map(int, [x, y])  # because ghost coords are floats
-                self[x, y].type = type
+                self[x, y].disposition = disposition
                 self[x, y].min_ghost_distance = Point.min_distance(
                     x, y, api.ghosts(state)
                 )
@@ -408,7 +424,7 @@ class MDPAgent(Agent):
             grid_copy = deepcopy(grid)
 
             for (x, y), point in grid:
-                if point.type != States.GHOST_HOSTILE:
+                if point.disposition != Dispositions.GHOST_HOSTILE:
                     point.utility = point.reward + \
                         cls.GAMMA * \
                         cls.__maximum_expected_utility(x, y, grid_copy)
