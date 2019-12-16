@@ -63,6 +63,7 @@ snake_case(api)
 class Coordinate(tuple):
     '''
     Tuple wrapper ensuring: size is 2, x & y are ints and enabling easy addition.
+    For example: Tuple[int, int]
     '''
     def __new__(cls, x, y):
         return super(Coordinate, cls).__new__(cls, (int(x), int(y)))
@@ -78,7 +79,6 @@ class Dispositions(object):
     '''
     Enum of possible board point states.
     '''
-    PACMAN = 'PACMAN'
     EMPTY = 'EMPTY'
     CAPSULE = 'CAPSULE'
     FOOD = 'FOOD'
@@ -102,7 +102,6 @@ class Point(object):
     REWARDS = {
         # Negative rewards
         Dispositions.EMPTY: -0.04,
-        Dispositions.PACMAN: -0.04,
         Dispositions.GHOST_HOSTILE: -5,
         Dispositions.GHOST_EDIBLE: -2,
         Dispositions.GHOST_NEIGHBOUR: -2,
@@ -306,14 +305,13 @@ class Grid(object):
         Grid.FILL_COUNT = 0
 
         points = {
-            Dispositions.PACMAN: [api.where_am_i(state)],
             Dispositions.FOOD: api.food(state),
             Dispositions.CAPSULE: api.capsules(state),
             Dispositions.GHOST_HOSTILE: [ghost for ghost, time in api.ghost_states_with_times(state) if time <= Grid.GHOST_SAFE_TIME],
             Dispositions.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
         }
 
-        for disposition, coordinates in points.items():
+        for disposition, coordinates in points.iteritems():
             for x, y in coordinates:
                 Grid.FILL_COUNT += 1
                 coordinate = Coordinate(x, y)
@@ -342,14 +340,14 @@ class MDPAgent(Agent):
         Directions.NORTH: Coordinate(0, 1),
         Directions.EAST: Coordinate(1, 0),
         Directions.SOUTH: Coordinate(0, -1),
-        Directions.WEST: Coordinate(-1, 0)
+        Directions.WEST: Coordinate(-1, 0),
     }
     # Directions mapped to list of left and right directions
     NON_DETERMINISTIC_DIRECTIONS = {
         Directions.NORTH: [Directions.EAST, Directions.WEST],
         Directions.EAST: [Directions.NORTH, Directions.SOUTH],
         Directions.SOUTH: [Directions.EAST, Directions.WEST],
-        Directions.WEST: [Directions.NORTH, Directions.SOUTH]
+        Directions.WEST: [Directions.NORTH, Directions.SOUTH],
     }
 
     @classmethod
@@ -379,7 +377,9 @@ class MDPAgent(Agent):
             Grid.GHOST_RADIUS = 3
         Grid.WALLS = set(api.walls(state))
         Grid.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
-        MDPAgent.ITERATION_LIMIT = ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
+        MDPAgent.ITERATION_LIMIT = int(
+            ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
+        )
 
     @classmethod
     def get_action(cls, state):
@@ -396,11 +396,11 @@ class MDPAgent(Agent):
 
         grid = cls.__value_iteration(grid)
 
-        coodinate = Coordinate(*api.where_am_i(state))
+        coordinate = Coordinate(*api.where_am_i(state))
 
         legal = api.legal_actions(state)
 
-        return api.make_move(direction=cls.__policy(coodinate, grid, legal), legal=legal)
+        return api.make_move(direction=cls.__policy(grid, coordinate, legal), legal=legal)
 
     @classmethod
     def __value_iteration(cls, grid):
@@ -415,23 +415,19 @@ class MDPAgent(Agent):
             A new grid containting updated utility values by performing value iteration
             on each point.
         '''
-        iterations = 0
-
-        while iterations < MDPAgent.ITERATION_LIMIT:
+        for _ in xrange(MDPAgent.ITERATION_LIMIT):
             grid_copy = deepcopy(grid)
 
             for coordinate, point in grid:
                 if point.disposition != Dispositions.GHOST_HOSTILE:
                     point.utility = point.reward + \
                         cls.GAMMA * \
-                        cls.__maximum_expected_utility(coordinate, grid_copy)
-
-            iterations += 1
+                        cls.__maximum_expected_utility(grid_copy, coordinate)
 
         return grid
 
     @classmethod
-    def __policy(cls, coordinate, grid, legal):
+    def __policy(cls, grid, coordinate, legal):
         '''
         Finds the best policy from position (x, y), that's also included in legal moves.
 
@@ -444,11 +440,11 @@ class MDPAgent(Agent):
             Direction representing the optimum policy from (x, y)
         '''
         return max([
-            (utility, direction) for (direction, utility) in cls.__expected_utilities(coordinate, grid).iteritems() if direction in legal
+            (utility, direction) for (direction, utility) in cls.__expected_utilities(grid, coordinate).iteritems() if direction in legal
         ])[1]
 
     @classmethod
-    def __maximum_expected_utility(cls, coordinate, grid):
+    def __maximum_expected_utility(cls, grid, coordinate):
         '''
         Calculates and returns the maximum expected utility at (x, y).
 
@@ -459,10 +455,10 @@ class MDPAgent(Agent):
         Returns:
             Floating point number representing maximum expected utility.
         '''
-        return max(cls.__expected_utilities(coordinate, grid).values())
+        return max(cls.__expected_utilities(grid, coordinate).values())
 
     @classmethod
-    def __expected_utilities(cls, coordinate, grid):
+    def __expected_utilities(cls, grid, coordinate):
         '''
         Calculates the expected utility for moving in each direction from (x, y).
 
