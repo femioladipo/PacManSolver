@@ -387,7 +387,7 @@ class MDPAgent(Agent):
     # Convergence iteration limit
     ITERATION_LIMIT = 15
     # Gamma value in bellman equation
-    GAMMA = 0.9
+    GAMMA = None
     # Probability for each displacement for each direction
     DIRECTION_PROBABILITIES = {
         direction: [(
