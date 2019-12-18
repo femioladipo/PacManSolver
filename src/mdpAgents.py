@@ -39,7 +39,14 @@ def camel_to_snake(term):
 
 def camel_case(original):
     '''
-    Used on a class to alias every method with a camel case version.
+    Used on a namespace to alias every method within to a camel case version.
+
+    E.g:
+    >>> import namespace_1
+    >>> camel_case(namespace_1)
+    >>> # or
+    >>> @camel_case
+    >>> class namespace_2
     '''
     for name, method_or_value in original.__dict__.copy().iteritems():
         setattr(original, snake_to_camel(name), method_or_value)
@@ -48,7 +55,14 @@ def camel_case(original):
 
 def snake_case(original):
     '''
-    Used on a class to alias every method with a snake case version.
+    Used on a namespace to alias every method within to a snake case version.
+
+    E.g:
+    >>> import namespace_1
+    >>> snake_case(namespace_1)
+    >>> # or
+    >>> @snake_case
+    >>> class namespace_2
     '''
     for name, method_or_value in original.__dict__.copy().iteritems():
         setattr(original, camel_to_snake(name), method_or_value)
