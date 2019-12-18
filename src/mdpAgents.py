@@ -111,11 +111,11 @@ class Point(object):
     }
 
     def __init__(
-            self,
-            utility=None,
-            disposition=Dispositions.EMPTY,
-            min_ghost_distance=None,
-        ):
+        self,
+        utility=None,
+        disposition=Dispositions.EMPTY,
+        min_ghost_distance=None,
+    ):
         '''
         Args:
             utility (int): Initial utility.
@@ -173,8 +173,9 @@ class Point(object):
             the point is less than the ghost radius units away from any ghost,
             the state  is overridden with Dispositions.GHOST_NEIGHBOUR.
         '''
-        if self.__disposition not in {Dispositions.GHOST_EDIBLE, Dispositions.GHOST_HOSTILE} and \
-                self.min_ghost_distance <= Grid.GHOST_RADIUS:
+        if self.__disposition not in {
+            Dispositions.GHOST_EDIBLE, Dispositions.GHOST_HOSTILE,
+        } and self.min_ghost_distance <= Grid.GHOST_RADIUS:
             return Dispositions.GHOST_NEIGHBOUR
 
         return self.__disposition
@@ -266,7 +267,7 @@ class Grid(object):
         '''
         self.__grid = {
             Coordinate(x, y): Point()
-            for y in range(Grid.HEIGHT) for x in range(Grid.WIDTH)
+            for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH)
             if (x, y) not in Grid.WALLS
         }
         self.__update_positions(state)
@@ -330,7 +331,7 @@ class Grid(object):
             ],
         }
 
-        for disposition, coordinates in points.items():
+        for disposition, coordinates in points.iteritems():
             for x, y in coordinates:
                 Grid.FILL_COUNT += 1
                 coordinate = Coordinate(x, y)  # because ghost x, y are floats
@@ -427,7 +428,7 @@ class MDPAgent(Agent):
             A new grid containting updated utility values by performing value
             iteration on each point.
         '''
-        for _ in range(MDPAgent.ITERATION_LIMIT):
+        for _ in xrange(MDPAgent.ITERATION_LIMIT):
             grid_copy = deepcopy(grid)
 
             for coordinate, point in grid:
@@ -488,11 +489,9 @@ class MDPAgent(Agent):
 
         for direction, probabilities in MDPAgent.DIRECTION_PROBABILITIES.iteritems():
             for displacement, probability in probabilities:
-                if coordinate+displacement in grid:
-                    expected_utilities[direction] += probability * \
-                        grid[coordinate+displacement].utility
-                else:
-                    expected_utilities[direction] += probability * \
-                        grid[coordinate].utility
+                expected_utilities[direction] += probability * \
+                    grid[coordinate+displacement].utility \
+                    if coordinate+displacement in grid  \
+                    else grid[coordinate].utility
 
         return expected_utilities
