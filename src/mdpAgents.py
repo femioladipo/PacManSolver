@@ -392,13 +392,13 @@ class MDPAgent(Agent):
     DIRECTION_PROBABILITIES = {
         direction: [(
             Actions._directions[direction],
-             api.direction_prob
+            api.direction_prob
         ), (
             Actions._directions[Directions.LEFT[direction]],
-             (1-api.direction_prob)/2
+            (1-api.direction_prob)/2
         ), (
             Actions._directions[Directions.RIGHT[direction]],
-             (1-api.direction_prob)/2
+            (1-api.direction_prob)/2
         )] for direction in Actions._directions.iterkeys()
     }
 
