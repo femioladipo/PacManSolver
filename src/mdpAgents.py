@@ -239,8 +239,7 @@ class Point(object):
     def __f_phi(self):
         '''
         Returns:
-            Value between 1 and e representing ratio of empty space to filled 
-            space.
+            Value between 1 and e representing ratio of empty space to filled space.
         '''
         return exp((Grid.size() - Grid.FILL_COUNT) / Grid.size())
 
@@ -275,7 +274,7 @@ class Grid(object):
     MAX_DISTANCE = 0
     # Number of filled spaces on the board
     FILL_COUNT = 0
-    # Time remaining in edible mode, where ghosts are still considered safe
+    # Amount of time remaining in edible mode, where ghosts are still considered safe
     GHOST_SAFE_TIME = 3
     # Radius around ghosts pacman should avoid
     GHOST_RADIUS = 1
@@ -286,7 +285,7 @@ class Grid(object):
         '''
         Instantiates a grid of size Grid.Height * Grid.Width, or size 0 if
         either Grid.Height or Grid.Width doesn't exist. Setting the relevant 
-        board points from the game state, 
+        board points from the game state.
         '''
         self.__grid = {
             Coordinate(x, y): Point()
@@ -482,8 +481,8 @@ class MDPAgent(Agent):
         '''
         return max([
             (utility, direction)
-            for direction, utility in 
-                cls.__expected_utilities(grid, coordinate).iteritems()
+            for direction, utility in
+            cls.__expected_utilities(grid, coordinate).iteritems()
             if direction in legal
         ])[1]
 
@@ -504,8 +503,7 @@ class MDPAgent(Agent):
     @classmethod
     def __expected_utilities(cls, grid, coordinate):
         '''
-        Calculates the expected utility for moving in each direction from 
-        (x, y).
+        Calculates the expected utility for moving in each direction from (x, y).
 
         Args:
             coordinate (Coordinate): (x, y) coordinate of the point
@@ -519,9 +517,11 @@ class MDPAgent(Agent):
         for direction, probabilities in \
                 MDPAgent.DIRECTION_PROBABILITIES.iteritems():
             for displacement, probability in probabilities:
-                expected_utilities[direction] += probability * \
-                    grid[coordinate+displacement].utility \
-                    if coordinate+displacement in grid  \
-                    else grid[coordinate].utility
+                if coordinate+displacement in grid:
+                    expected_utilities[direction] += probability * \
+                        grid[coordinate+displacement].utility
+                else:
+                    expected_utilities[direction] += probability * \
+                        grid[coordinate].utility
 
         return expected_utilities
