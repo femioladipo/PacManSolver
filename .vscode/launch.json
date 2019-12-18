@@ -8,8 +8,8 @@
       "name": "Python Pacman",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/cw_src/pacman.py",
-      "cwd": "${workspaceFolder}/cw_src",
+      "program": "${workspaceFolder}/src/pacman.py",
+      "cwd": "${workspaceFolder}/src",
       "args": [
         "-p",
         "MDPAgent",
