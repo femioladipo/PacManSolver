@@ -1,11 +1,8 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python Pacman",
+      "name": "Pacman: smallGrid",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/src/pacman.py",
@@ -15,6 +12,23 @@
         "MDPAgent",
         "-l",
         "smallGrid",
+        "-n",
+        "1",
+        "-q"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Pacman: mediumClassic",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/pacman.py",
+      "cwd": "${workspaceFolder}/src",
+      "args": [
+        "-p",
+        "MDPAgent",
+        "-l",
+        "mediumClassic",
         "-n",
         "1",
         "-q"
