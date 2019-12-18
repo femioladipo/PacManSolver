@@ -79,7 +79,9 @@ snake_case(api)
 
 class Coordinate(tuple):
     '''
-    Tuple wrapper ensuring: size is 2, x & y are ints and enabling easy addition.
+    Tuple wrapper ensuring: size is 2, x & y are ints and enabling easy 
+    addition.
+
     For example: Tuple[int, int]
     '''
     def __new__(cls, x, y):
@@ -234,7 +236,9 @@ class Point(object):
         Returns:
             Value between 1 and e representing closeness to a ghost.
         '''
-        return exp((Grid.MAX_DISTANCE - self.min_ghost_distance) / Grid.MAX_DISTANCE)
+        return exp(
+            (Grid.MAX_DISTANCE - self.min_ghost_distance) / Grid.MAX_DISTANCE
+        )
 
     @staticmethod
     def __f_phi():
@@ -262,7 +266,7 @@ class Point(object):
         '''
         if not items:
             return Grid.MAX_DISTANCE
-        return min([util.manhattan_distance(coordinate, item) for item in items])
+        return min(util.manhattan_distance(coordinate, item) for item in items)
 
 
 class Grid(object):
@@ -321,7 +325,8 @@ class Grid(object):
         Checks if coordinate is in the grid.
 
         Args:
-            coordinate (Coordinate): (x,y) coordinates of position to check for.
+            coordinate (Coordinate): (x,y) coordinates of position to check 
+            for.
 
         Returns:
             Bool that is true if coordinate is in the grid, or false otherwise.
@@ -385,10 +390,16 @@ class MDPAgent(Agent):
     GAMMA = 0.9
     # Probability for each displacement for each direction
     DIRECTION_PROBABILITIES = {
-        direction: [(Actions._directions[direction], api.direction_prob)] +
-        [(Actions._directions[Directions.LEFT[direction]], (1-api.direction_prob)/2)] +
-        [(Actions._directions[Directions.RIGHT[direction]], (1-api.direction_prob)/2)]
-        for direction in Actions._directions.iterkeys()
+        direction: [(
+            Actions._directions[direction],
+             api.direction_prob
+        ), (
+            Actions._directions[Directions.LEFT[direction]],
+             (1-api.direction_prob)/2
+        ), (
+            Actions._directions[Directions.RIGHT[direction]],
+             (1-api.direction_prob)/2
+        )] for direction in Actions._directions.iterkeys()
     }
 
     @classmethod
