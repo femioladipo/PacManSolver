@@ -20,7 +20,10 @@ def snake_to_camel(term):
     Returns:
         Camel cased version of term
     '''
-    return ''.join(item if i == 0 else item.capitalize() for i, item in enumerate(term.split('_')))
+    return ''.join(
+        item if i == 0 else item.capitalize()
+        for i, item in enumerate(term.split('_'))
+    )
 
 
 def camel_to_snake(term):
@@ -106,10 +109,13 @@ class Point(object):
     A single point on the board.
 
     Attributes:
-        disposition (Dispositions): Current disposition, discribing the state of the point.
-        reward (float): Current reward value of this point dependent on current disposition.
+        disposition (Dispositions): Current disposition, discribing the state 
+        of the point.
+        reward (float): Current reward value of this point dependent on current 
+        disposition.
         utility (float): Current utility value of this point.
-        min_ghost_distance (int): Minimum manhattan distance from point to a ghost.
+        min_ghost_distance (int): Minimum manhattan distance from point to a 
+        ghost.
     '''
 
     # Reward value for each state
@@ -204,35 +210,37 @@ class Point(object):
         Calculates and returns the shaped reward depending on the current state.
 
             Dynamic Reward - Positive
-            reward(s) = d * f_phi / f_delta
-            where:
-                d = default reward value
+            R(s) = r(s) * f_phi / f_delta
 
             Dynamic Reward - Negative
-            reward(s) = d * f_delta
+            R(s) = r(s) * f_delta
+
             where:
-                d = default reward value
+                r(s) = default reward value
 
         Returns:
             Float representing the points current reward value.
         '''
         if self.disposition in {Dispositions.FOOD, Dispositions.CAPSULE}:
-            return Point.REWARDS[self.disposition] * self.f_phi() / self.f_delta()
+            return Point.REWARDS[self.disposition] * self.__f_phi / self.__f_delta
 
-        return Point.REWARDS[self.disposition] * self.f_delta()
+        return Point.REWARDS[self.disposition] * self.__f_delta
 
-    def f_delta(self):
+    @property
+    def __f_delta(self):
         '''
         Returns:
             Value between 1 and e representing closeness to a ghost.
         '''
         return exp((Grid.MAX_DISTANCE - self.min_ghost_distance) / Grid.MAX_DISTANCE)
 
-    @staticmethod
-    def f_phi():
+    # @staticmethod
+    @property
+    def __f_phi(self):
         '''
         Returns:
-            Value between 1 and e representing ratio of empty space to filled space.
+            Value between 1 and e representing ratio of empty space to filled 
+            space.
         '''
         return exp((Grid.size() - Grid.FILL_COUNT) / Grid.size())
 
@@ -248,7 +256,8 @@ class Point(object):
             items (list): List of coordinates
 
         Returns:
-            An integer representing the distance between closest item and the coordinate.
+            An integer representing the distance between closest item and the 
+            coordinate.
         '''
         return min([util.manhattan_distance(coordinate, item) for item in items])
 
@@ -266,7 +275,7 @@ class Grid(object):
     MAX_DISTANCE = 0
     # Number of filled spaces on the board
     FILL_COUNT = 0
-    # Amount of time remaining in edible mode, where ghosts are still considered safe
+    # Time remaining in edible mode, where ghosts are still considered safe
     GHOST_SAFE_TIME = 3
     # Radius around ghosts pacman should avoid
     GHOST_RADIUS = 1
@@ -423,11 +432,15 @@ class MDPAgent(Agent):
 
         grid = cls.__value_iteration(grid)
 
-        coordinate = Coordinate(*api.where_am_i(state))
-
         legal = api.legal_actions(state)
 
-        return api.make_move(direction=cls.__policy(grid, coordinate, legal), legal=legal)
+        direction = cls.__policy(
+            grid,
+            Coordinate(*api.where_am_i(state)),
+            legal,
+        )
+
+        return api.make_move(direction, legal)
 
     @classmethod
     def __value_iteration(cls, grid):
@@ -469,7 +482,8 @@ class MDPAgent(Agent):
         '''
         return max([
             (utility, direction)
-            for direction, utility in cls.__expected_utilities(grid, coordinate).iteritems()
+            for direction, utility in 
+                cls.__expected_utilities(grid, coordinate).iteritems()
             if direction in legal
         ])[1]
 
@@ -490,7 +504,8 @@ class MDPAgent(Agent):
     @classmethod
     def __expected_utilities(cls, grid, coordinate):
         '''
-        Calculates the expected utility for moving in each direction from (x, y).
+        Calculates the expected utility for moving in each direction from 
+        (x, y).
 
         Args:
             coordinate (Coordinate): (x, y) coordinate of the point
@@ -501,7 +516,8 @@ class MDPAgent(Agent):
         '''
         expected_utilities = defaultdict(int)
 
-        for direction, probabilities in MDPAgent.DIRECTION_PROBABILITIES.iteritems():
+        for direction, probabilities in \
+                MDPAgent.DIRECTION_PROBABILITIES.iteritems():
             for displacement, probability in probabilities:
                 expected_utilities[direction] += probability * \
                     grid[coordinate+displacement].utility \
