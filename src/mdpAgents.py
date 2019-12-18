@@ -189,9 +189,10 @@ class Point(object):
     def disposition(self):
         '''
         Returns:
-            String at out Dispositions enum, representing current state.  However, if
-            the point is less than the ghost radius units away from any ghost,
-            the state  is overridden with Dispositions.GHOST_NEIGHBOUR.
+            String at out Dispositions enum, representing current state. 
+            However, if the point is less than the ghost radius units away 
+            from any ghost, the state  is overridden with 
+            Dispositions.GHOST_NEIGHBOUR.
         '''
         if self.__disposition not in {
             Dispositions.GHOST_EDIBLE, Dispositions.GHOST_HOSTILE,
@@ -207,7 +208,8 @@ class Point(object):
     @property
     def reward(self):
         '''
-        Calculates and returns the shaped reward depending on the current state.
+        Calculates and returns the shaped reward depending on the current
+        state.
 
             Dynamic Reward - Positive
             R(s) = r(s) * f_phi / f_delta
@@ -222,11 +224,11 @@ class Point(object):
             Float representing the points current reward value.
         '''
         if self.disposition in {Dispositions.FOOD, Dispositions.CAPSULE}:
-            return Point.REWARDS[self.disposition] * self.__f_phi / self.__f_delta
+            return Point.REWARDS[self.disposition] * self.__f_phi() / \
+                self.__f_delta()
 
-        return Point.REWARDS[self.disposition] * self.__f_delta
+        return Point.REWARDS[self.disposition] * self.__f_delta()
 
-    @property
     def __f_delta(self):
         '''
         Returns:
@@ -234,12 +236,12 @@ class Point(object):
         '''
         return exp((Grid.MAX_DISTANCE - self.min_ghost_distance) / Grid.MAX_DISTANCE)
 
-    # @staticmethod
-    @property
-    def __f_phi(self):
+    @staticmethod
+    def __f_phi():
         '''
         Returns:
-            Value between 1 and e representing ratio of empty space to filled space.
+            Value between 1 and e representing ratio of empty space to filled 
+            space.
         '''
         return exp((Grid.size() - Grid.FILL_COUNT) / Grid.size())
 
@@ -258,6 +260,8 @@ class Point(object):
             An integer representing the distance between closest item and the 
             coordinate.
         '''
+        if not items:
+            return Grid.MAX_DISTANCE
         return min([util.manhattan_distance(coordinate, item) for item in items])
 
 
@@ -274,7 +278,7 @@ class Grid(object):
     MAX_DISTANCE = 0
     # Number of filled spaces on the board
     FILL_COUNT = 0
-    # Amount of time remaining in edible mode, where ghosts are still considered safe
+    # Time remaining in edible mode, where ghosts are still considered safe
     GHOST_SAFE_TIME = 3
     # Radius around ghosts pacman should avoid
     GHOST_RADIUS = 1
@@ -358,9 +362,11 @@ class Grid(object):
                 Grid.FILL_COUNT += 1
                 coordinate = Coordinate(x, y)  # because ghost x, y are floats
                 self[coordinate].disposition = disposition
-                self[coordinate].min_ghost_distance = Point.min_distance(
-                    coordinate, api.ghosts(state)
-                )
+
+        for coordinate, point in self:
+            point.min_ghost_distance = Point.min_distance(
+                coordinate, points[Dispositions.GHOST_HOSTILE]
+            )
 
         MDPAgent.set_gamma(len(api.food(state) + api.capsules(state)))
 
@@ -458,7 +464,9 @@ class MDPAgent(Agent):
             grid_copy = deepcopy(grid)
 
             for coordinate, point in grid:
-                if point.disposition != Dispositions.GHOST_HOSTILE:
+                if point.disposition not in {
+                    Dispositions.GHOST_HOSTILE, Dispositions.GHOST_NEIGHBOUR
+                }:
                     point.utility = point.reward + \
                         cls.GAMMA * \
                         cls.__maximum_expected_utility(grid_copy, coordinate)
@@ -503,7 +511,8 @@ class MDPAgent(Agent):
     @classmethod
     def __expected_utilities(cls, grid, coordinate):
         '''
-        Calculates the expected utility for moving in each direction from (x, y).
+        Calculates the expected utility for moving in each direction from 
+        (x, y).
 
         Args:
             coordinate (Coordinate): (x, y) coordinate of the point
