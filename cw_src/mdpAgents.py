@@ -4,7 +4,7 @@ from math import exp, sqrt, ceil
 from re import sub
 
 from pacman import Directions
-from game import Agent
+from game import Agent, Actions
 import api
 import util
 
@@ -110,7 +110,12 @@ class Point(object):
         Dispositions.FOOD: 2,
     }
 
-    def __init__(self, utility=None, disposition=Dispositions.EMPTY, min_ghost_distance=None):
+    def __init__(
+            self,
+            utility=None,
+            disposition=Dispositions.EMPTY,
+            min_ghost_distance=None,
+        ):
         '''
         Args:
             utility (int): Initial utility.
@@ -122,14 +127,18 @@ class Point(object):
         self.__min_ghost_distance = min_ghost_distance
 
     def __copy__(self):
-        return Point(utility=self.__utility, disposition=self.__disposition, min_ghost_distance=self.__min_ghost_distance)
+        return Point(
+            utility=self.__utility,
+            disposition=self.__disposition,
+            min_ghost_distance=self.__min_ghost_distance,
+        )
 
     @property
     def min_ghost_distance(self):
         '''
         Returns:
-            Integer representing manhattan distance to closest ghost, or max grid distance
-            if not set.
+            Integer representing manhattan distance to closest ghost, or max 
+            grid distance if not set.
         '''
         if self.__min_ghost_distance is None:
             return Grid.MAX_DISTANCE
@@ -251,13 +260,14 @@ class Grid(object):
 
     def __init__(self, state):
         '''
-        Instantiates a grid of size Grid.Height * Grid.Width, or size 0 if either Grid.Height or
-        Grid.Width doesn't exist.
-
-        Instantiates a new grid from a game state, setting the relevant board elements.
+        Instantiates a grid of size Grid.Height * Grid.Width, or size 0 if
+        either Grid.Height or Grid.Width doesn't exist. Setting the relevant 
+        board points from the game state, 
         '''
         self.__grid = {
-            Coordinate(x, y): Point() for y in xrange(Grid.HEIGHT) for x in xrange(Grid.WIDTH) if (x, y) not in Grid.WALLS
+            Coordinate(x, y): Point()
+            for y in range(Grid.HEIGHT) for x in range(Grid.WIDTH)
+            if (x, y) not in Grid.WALLS
         }
         self.__update_positions(state)
 
@@ -284,7 +294,7 @@ class Grid(object):
         Checks if coordinate is in the grid.
 
         Args:
-            coordinate (2-tuple): (x,y) coordinates of position to check for.
+            coordinate (Coordinate): (x,y) coordinates of position to check for.
 
         Returns:
             Bool that is true if coordinate is in the grid, or false otherwise.
@@ -293,11 +303,12 @@ class Grid(object):
 
     def __update_positions(self, state):
         '''
-        Repaints the grid according to the passed in state. Updating the position of pacman,
-        the ghosts, the food, the capsules, and the blank spaces.
+        Repaints the grid according to the passed in state. Updating the 
+        position of pacman, the ghosts, the food, the capsules, and the blank
+        spaces.
 
-        In addition calculates the number of filled spaces and stores this value statically
-        on Point, for later use in the reward function.
+        In addition calculates the number of filled spaces and stores this value
+        statically on Point, for later use in the reward function.
 
         Args:
             state: Current game state.
@@ -307,14 +318,22 @@ class Grid(object):
         points = {
             Dispositions.FOOD: api.food(state),
             Dispositions.CAPSULE: api.capsules(state),
-            Dispositions.GHOST_HOSTILE: [ghost for ghost, time in api.ghost_states_with_times(state) if time <= Grid.GHOST_SAFE_TIME],
-            Dispositions.GHOST_EDIBLE: [ghost for ghost, time in api.ghost_states_with_times(state) if time > Grid.GHOST_SAFE_TIME],
+            Dispositions.GHOST_HOSTILE: [
+                ghost
+                for ghost, time in api.ghost_states_with_times(state)
+                if time <= Grid.GHOST_SAFE_TIME
+            ],
+            Dispositions.GHOST_EDIBLE: [
+                ghost
+                for ghost, time in api.ghost_states_with_times(state)
+                if time > Grid.GHOST_SAFE_TIME
+            ],
         }
 
-        for disposition, coordinates in points.iteritems():
+        for disposition, coordinates in points.items():
             for x, y in coordinates:
                 Grid.FILL_COUNT += 1
-                coordinate = Coordinate(x, y)
+                coordinate = Coordinate(x, y)  # because ghost x, y are floats
                 self[coordinate].disposition = disposition
                 self[coordinate].min_ghost_distance = Point.min_distance(
                     coordinate, api.ghosts(state)
@@ -335,26 +354,19 @@ class MDPAgent(Agent):
     ITERATION_LIMIT = 15
     # Gamma value in bellman equation
     GAMMA = 0.9
-    # Directions mapped to displacement
-    DIRECTIONS = {
-        Directions.NORTH: Coordinate(0, 1),
-        Directions.EAST: Coordinate(1, 0),
-        Directions.SOUTH: Coordinate(0, -1),
-        Directions.WEST: Coordinate(-1, 0),
-    }
-    # Directions mapped to list of left and right directions
-    NON_DETERMINISTIC_DIRECTIONS = {
-        Directions.NORTH: [Directions.EAST, Directions.WEST],
-        Directions.EAST: [Directions.NORTH, Directions.SOUTH],
-        Directions.SOUTH: [Directions.EAST, Directions.WEST],
-        Directions.WEST: [Directions.NORTH, Directions.SOUTH],
+    # Probability for each displacement for each direction
+    DIRECTION_PROBABILITIES = {
+        direction: [(Actions._directions[direction], api.direction_prob)] +
+        [(Actions._directions[Directions.LEFT[direction]], (1-api.direction_prob)/2)] +
+        [(Actions._directions[Directions.RIGHT[direction]], (1-api.direction_prob)/2)]
+        for direction in Actions._directions.iterkeys()
     }
 
     @classmethod
     def set_gamma(cls, x):
         '''
-        Uses Richard's Curve to distribute x over the open interval (0.6, 1) in a sigmoid curve.
-        Then set's gamma to this value.
+        Uses Richard's Curve to distribute x over the open interval (0.6, 1) in
+        a sigmoid curve. Then set's gamma to this value.
         '''
         K = 1  # upper asymptote
         A = 0.6  # lower asymptote
@@ -373,10 +385,10 @@ class MDPAgent(Agent):
         '''
         Grid.HEIGHT = max([h for _, h in api.corners(state)]) + 1
         Grid.WIDTH = max([w for w, _ in api.corners(state)]) + 1
-        if Grid.WIDTH > 7 and Grid.HEIGHT > 7:
+        if Grid.WIDTH > 7 and Grid.HEIGHT > 7:  # mediumClassic or bigger
             Grid.GHOST_RADIUS = 3
-        Grid.WALLS = set(api.walls(state))
         Grid.MAX_DISTANCE = Grid.HEIGHT + Grid.WIDTH - 4
+        Grid.WALLS = set(api.walls(state))
         MDPAgent.ITERATION_LIMIT = int(
             ceil(sqrt(Grid.HEIGHT * Grid.WIDTH)) * 2
         )
@@ -405,17 +417,17 @@ class MDPAgent(Agent):
     @classmethod
     def __value_iteration(cls, grid):
         '''
-        Calculates and sets new utility values for every point on the grid, repeating
-        until MDPAgent.ITERATION_LIMIT is reached.
+        Calculates and sets new utility values for every point on the grid,
+        repeating until MDPAgent.ITERATION_LIMIT is reached.
 
         Args:
             grid (Grid): Grid representing the game state.
 
         Returns:
-            A new grid containting updated utility values by performing value iteration
-            on each point.
+            A new grid containting updated utility values by performing value
+            iteration on each point.
         '''
-        for _ in xrange(MDPAgent.ITERATION_LIMIT):
+        for _ in range(MDPAgent.ITERATION_LIMIT):
             grid_copy = deepcopy(grid)
 
             for coordinate, point in grid:
@@ -429,7 +441,8 @@ class MDPAgent(Agent):
     @classmethod
     def __policy(cls, grid, coordinate, legal):
         '''
-        Finds the best policy from position (x, y), that's also included in legal moves.
+        Finds the best policy from position (x, y), that's also included in 
+        legal moves.
 
         Args:
             coordinate (Coordinate): (x, y) coordinate of the point
@@ -440,7 +453,9 @@ class MDPAgent(Agent):
             Direction representing the optimum policy from (x, y)
         '''
         return max([
-            (utility, direction) for (direction, utility) in cls.__expected_utilities(grid, coordinate).iteritems() if direction in legal
+            (utility, direction)
+            for direction, utility in cls.__expected_utilities(grid, coordinate).iteritems()
+            if direction in legal
         ])[1]
 
     @classmethod
@@ -471,18 +486,13 @@ class MDPAgent(Agent):
         '''
         expected_utilities = defaultdict(int)
 
-        for main_direction, displacement in cls.DIRECTIONS.iteritems():
-            main_direction_prob = [(displacement, api.direction_prob)]
-            non_deterministic_directions_prob = [
-                (cls.DIRECTIONS[direction], (1-api.direction_prob)/2) for direction in cls.NON_DETERMINISTIC_DIRECTIONS[main_direction]
-            ]
-            # for all a in A(s):  dict[a] <- P(s'|s, a) * U(s')  (summed over all s')
-            for displacement, prob in main_direction_prob + non_deterministic_directions_prob:
+        for direction, probabilities in MDPAgent.DIRECTION_PROBABILITIES.iteritems():
+            for displacement, probability in probabilities:
                 if coordinate+displacement in grid:
-                    expected_utilities[main_direction] += prob * \
+                    expected_utilities[direction] += probability * \
                         grid[coordinate+displacement].utility
                 else:
-                    expected_utilities[main_direction] += prob * \
+                    expected_utilities[direction] += probability * \
                         grid[coordinate].utility
 
         return expected_utilities
