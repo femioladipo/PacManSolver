@@ -10,5 +10,12 @@ pipenv shell
 
 ## Run
 ```
-python pacman.py -p <agent-name> [-l <layout-name>] [-n <number-of-runs>] [-t or -q] 
+cd src
+python pacman.py -p <agent-name> -l <layout-name> [-n <number-of-runs>] [-t or -q] 
+```
+
+## Commands
+```
+python pacman.py -p MDPAgent -l smallGrid -n 10 -q
+python pacman.py -p MDPAgent -l mediumClassic -n 10 -q
 ```
