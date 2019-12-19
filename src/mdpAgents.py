@@ -196,9 +196,8 @@ class Point(object):
             from any ghost, the state  is overridden with 
             Dispositions.GHOST_NEIGHBOUR.
         '''
-        if self.__disposition not in {
-            Dispositions.GHOST_EDIBLE, Dispositions.GHOST_HOSTILE,
-        } and self.min_ghost_distance <= Grid.GHOST_RADIUS:
+        if self.__disposition != Dispositions.GHOST_HOSTILE and \
+                self.min_ghost_distance <= Grid.GHOST_RADIUS:
             return Dispositions.GHOST_NEIGHBOUR
 
         return self.__disposition
@@ -364,7 +363,8 @@ class Grid(object):
 
         for disposition, coordinates in points.iteritems():
             for x, y in coordinates:
-                Grid.FILL_COUNT += 1
+                if disposition in {Dispositions.FOOD, Dispositions.CAPSULE}:
+                    Grid.FILL_COUNT += 1
                 coordinate = Coordinate(x, y)  # because ghost x, y are floats
                 self[coordinate].disposition = disposition
 
@@ -498,12 +498,12 @@ class MDPAgent(Agent):
         Returns:
             Direction representing the optimum policy from (x, y)
         '''
-        return max([
+        return max(
             (utility, direction)
             for direction, utility in
             cls.__expected_utilities(grid, coordinate).iteritems()
             if direction in legal
-        ])[1]
+        )[1]
 
     @classmethod
     def __maximum_expected_utility(cls, grid, coordinate):
